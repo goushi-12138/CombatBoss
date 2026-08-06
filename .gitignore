@@ -1,0 +1,56 @@
+# 忽略所有二进制目录
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# 忽略所有二进制资产文件
+*.uasset
+*.umap
+*.pak
+*.utoc
+*.ucas
+
+# 忽略所有美术、音频、视频等资源文件
+*.FBX
+*.fbx
+*.obj
+*.blend
+*.mb
+*.ma
+*.tga
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.psd
+*.tif
+*.exr
+*.hdr
+*.wav
+*.mp3
+*.ogg
+*.wma
+*.mp4
+*.avi
+*.mov
+*.flv
+*.ttf
+*.otf
+*.dll
+*.lib
+*.exe
+*.dylib
+*.so
+
+# Visual Studio / Rider 生成文件
+.vs/
+.idea/
+*.suo
+*.user
+*.sln.DotSettings.user
+
+# 系统文件
+.DS_Store
+Thumbs.db

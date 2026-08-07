@@ -1,4 +1,5 @@
 #include "Boss/GA_TurnToFace.h"
+#include "Boss/Boss_Berserker.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
@@ -6,91 +7,89 @@
 
 UGA_TurnToFace::UGA_TurnToFace()
 {
-	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-	// 这个技能由事件触发，或者直接通过Tag激活
-	// 设置默认的 AssetTags
-	FGameplayTagContainer DefaultTags;
-	DefaultTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Boss.Turn")));
-	SetAssetTags(DefaultTags);
+    InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+    // 设置标签
+    FGameplayTagContainer NewTags;
+    NewTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Boss.Turn")));
+    SetAssetTags(NewTags);
 }
 
 void UGA_TurnToFace::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
+    const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayAbilityActivationInfo ActivationInfo,
+    const FGameplayEventData* TriggerEventData)
 {
-	UE_LOG(LogTemp, Warning, TEXT("GA_TurnToFace: ActivateAbility called")); // 1. 函数是否被调用
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		UE_LOG(LogTemp, Error, TEXT("GA_TurnToFace: CommitAbility FAILED!")); // 2. CommitAbility 是否成功
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+    if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
 
-	AActor* Avatar = GetAvatarActorFromActorInfo();
-	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
-	if (!Avatar || !Player)
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+    AActor* Avatar = GetAvatarActorFromActorInfo();
+    APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+    if (!Avatar || !Player)
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
 
-	// 1. 计算朝向与玩家方向的夹角
-	FVector ToPlayer = (Player->GetActorLocation() - Avatar->GetActorLocation()).GetSafeNormal2D();
-	FVector MyForward = Avatar->GetActorForwardVector().GetSafeNormal2D();
+    // 1. 标记攻击状态（防止行为树打断）
+    if (ABoss_Berserker* Boss = Cast<ABoss_Berserker>(Avatar))
+    {
+        Boss->bIsAttacking = true;
+    }
 
-	float Dot = FVector::DotProduct(MyForward, ToPlayer);
-	float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.0f, 1.0f)));
-	FVector Cross = FVector::CrossProduct(MyForward, ToPlayer);
-	// 带符号的角度：正值为右，负值为左
-	float SignedAngle = (Cross.Z < 0) ? -Angle : Angle;
+    // 2. 计算夹角
+    FVector ToPlayer = (Player->GetActorLocation() - Avatar->GetActorLocation()).GetSafeNormal2D();
+    FVector MyForward = Avatar->GetActorForwardVector().GetSafeNormal2D();
+    float Dot = FVector::DotProduct(MyForward, ToPlayer);
+    float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.0f, 1.0f)));
+    FVector Cross = FVector::CrossProduct(MyForward, ToPlayer);
+    float SignedAngle = (Cross.Z < 0) ? -Angle : Angle;
 
-	// 2. 根据夹角选择蒙太奇
-	UAnimMontage* MontageToPlayLocal = nullptr;
-	const float AbsAngle = FMath::Abs(SignedAngle);
+    // 3. 选择蒙太奇
+    UAnimMontage* PlayMontage = nullptr;
+    const float AbsAngle = FMath::Abs(SignedAngle);
 
-	if (AbsAngle < 30.0f)
-	{
-		// 几乎已经面对，不需要转身，直接结束
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
-		return;
-	}
-	else if (AbsAngle < 120.0f)
-	{
-		// 90度转身
-		MontageToPlayLocal = (SignedAngle > 0) ? TurnRight90 : TurnLeft90;
-	}
-	else
-	{
-		// 180度转身
-		MontageToPlayLocal = (SignedAngle > 0) ? TurnRight180 : TurnLeft180;
-	}
+    if (AbsAngle < 30.0f)
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+        return;
+    }
+    else if (AbsAngle < 120.0f)
+    {
+        PlayMontage = (SignedAngle > 0) ? TurnRight90 : TurnLeft90;
+    }
+    else
+    {
+        PlayMontage = (SignedAngle > 0) ? TurnRight180 : TurnLeft180;
+    }
 
-	if (!MontageToPlayLocal)
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+    if (!PlayMontage)
+    {
+        EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+        return;
+    }
 
-	// 3. 播放蒙太奇，等待完成
-	UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-		this, NAME_None, MontageToPlayLocal);
-	MontageTask->OnCompleted.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageCompleted);
-	MontageTask->OnBlendOut.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageCompleted);
-	MontageTask->OnInterrupted.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageInterrupted);
-	MontageTask->OnCancelled.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageInterrupted);
-	MontageTask->ReadyForActivation();
-
-	// 标记 Boss 正在转身，防止攻击行为同时触发（可选）
-	// 可在 Boss 类中设置 bIsTurning = true
+    // 4. 播放蒙太奇（带根运动）
+    UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+        this, NAME_None, PlayMontage, 1.0f, NAME_None, true); // true = 应用根运动
+    MontageTask->OnCompleted.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageCompleted);
+    MontageTask->OnBlendOut.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageCompleted);
+    MontageTask->OnInterrupted.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageInterrupted);
+    MontageTask->OnCancelled.AddDynamic(this, &UGA_TurnToFace::OnTurnMontageInterrupted);
+    MontageTask->ReadyForActivation();
 }
 
 void UGA_TurnToFace::OnTurnMontageCompleted()
 {
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UGA_TurnToFace::OnTurnMontageInterrupted()
 {
-	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
+
+// EndAbility 在基类中已有，会自动清除 bIsAttacking

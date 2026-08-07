@@ -16,17 +16,6 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Animation")
     float Speed = 0.0f;
 
-    // 暴露方向变量（用于转身混合）
-    UPROPERTY(BlueprintReadOnly, Category = "Animation")
-    float Direction = 0.0f;
-private:
-    float PreviousYaw = 0.0f;
-    bool bHasPreviousYaw = false;
-
-public:
-    UFUNCTION(BlueprintCallable)
-    void DebugSetDirection(float InDirection) { Direction = InDirection; }
-
     UPROPERTY(BlueprintReadOnly, Category = "Animation")
     bool bIsPhaseOne = true;
 

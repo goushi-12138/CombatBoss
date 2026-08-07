@@ -47,10 +47,6 @@ protected:
 	UFUNCTION()
 	void OnMontageInterrupted();
 
-protected:
-	// 设置Boss与玩家之间的碰撞（忽略或恢复）
-	UFUNCTION(BlueprintCallable, Category = "BossGA")
-	void SetIgnorePlayerCollision(bool bIgnore);
 private:
 	// 用于伤害判定的延迟和事件响应（同样需要补上 UFUNCTION 以保证委托可以绑定）
 	UFUNCTION()

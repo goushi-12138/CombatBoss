@@ -33,7 +33,6 @@ void ABossAIController::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-    // 更新黑板数据
     TimeSinceLastUpdate += DeltaTime;
     if (TimeSinceLastUpdate >= UpdateInterval)
     {
@@ -41,35 +40,38 @@ void ABossAIController::Tick(float DeltaTime)
         UpdateBlackboard();
     }
 
-    // 旋转逻辑：只在非攻击状态下转向玩家
+    TimeSinceLastTurn += DeltaTime;
+
     APawn* ControlledPawn = GetPawn();
     APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+    if (!ControlledPawn || !PlayerPawn) return;
 
-    if (ControlledPawn && PlayerPawn)
+    ABoss_Berserker* Boss = Cast<ABoss_Berserker>(ControlledPawn);
+    if (!Boss || Boss->bIsAttacking || TimeSinceLastTurn < TurnCooldown) return;
+
+    FVector ToPlayer = PlayerPawn->GetActorLocation() - ControlledPawn->GetActorLocation();
+    ToPlayer.Z = 0.0f;
+    FVector Forward = ControlledPawn->GetActorForwardVector();
+    Forward.Z = 0.0f;
+    float Dot = FVector::DotProduct(Forward.GetSafeNormal(), ToPlayer.GetSafeNormal());
+    float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.0f, 1.0f)));
+
+    if (Angle > 45.0f)
     {
-        // 检查Boss是否正在攻击
-        ABoss_Berserker* Boss = Cast<ABoss_Berserker>(ControlledPawn);
-        bool bShouldRotate = true;
-
-        if (Boss)
+        IAbilitySystemInterface* ASCInterface = Cast<IAbilitySystemInterface>(ControlledPawn);
+        if (ASCInterface)
         {
-            bShouldRotate = !Boss->bIsAttacking;  // 攻击中不旋转
-        }
-
-        if (bShouldRotate)
-        {
-            FVector DirectionToPlayer = PlayerPawn->GetActorLocation() - ControlledPawn->GetActorLocation();
-            DirectionToPlayer.Z = 0.0f;
-
-            if (!DirectionToPlayer.IsNearlyZero())
+            UAbilitySystemComponent* ASC = ASCInterface->GetAbilitySystemComponent();
+            if (ASC)
             {
-                FRotator TargetRotation = DirectionToPlayer.Rotation();
-                FRotator CurrentRotation = ControlledPawn->GetActorRotation();
-                FRotator NewRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, 5.0f);
-                ControlledPawn->SetActorRotation(NewRotation);
+                FGameplayTagContainer TurnTag;
+                TurnTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Boss.Turn")));
+                if (ASC->TryActivateAbilitiesByTag(TurnTag))
+                    TimeSinceLastTurn = 0.0f;
             }
         }
     }
+    UE_LOG(LogTemp, Warning, TEXT("[TurnCheck] Angle: %.2f, bIsAttacking: %d, Cooldown: %.2f"), Angle, Boss->bIsAttacking, TimeSinceLastTurn);
 }
 
 void ABossAIController::UpdateBlackboard()
@@ -90,28 +92,6 @@ void ABossAIController::UpdateBlackboard()
 
         const float Dist = FVector::Dist(PlayerLocation, ControlledPawn->GetActorLocation());
         Blackboard->SetValueAsFloat(FName("DistanceToPlayer"), Dist);
-
-        /*
-        // ========== 【新增】强制Boss始终面向玩家 ==========
-        FVector DirectionToPlayer = PlayerLocation - ControlledPawn->GetActorLocation();
-        DirectionToPlayer.Z = 0.0f;  // 只在水平面旋转
-
-        if (!DirectionToPlayer.IsNearlyZero())
-        {
-            FRotator TargetRotation = DirectionToPlayer.Rotation();
-            FRotator CurrentRotation = ControlledPawn->GetActorRotation();
-
-            // 使用AIController的平滑旋转，避免瞬间转向
-            FRotator NewRotation = FMath::RInterpTo(
-                CurrentRotation,
-                TargetRotation,
-                GetWorld()->GetDeltaSeconds(),
-                8.0f  // 旋转速度，越大越快
-            );
-
-            ControlledPawn->SetActorRotation(NewRotation);
-        }
-        */
     }
 }
 

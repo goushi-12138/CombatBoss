@@ -36,4 +36,7 @@ private:
 
 	void UpdateBlackboard();
 
+private:
+	float TimeSinceLastTurn = 0.0f;
+	float TurnCooldown = 0.5f;
 };

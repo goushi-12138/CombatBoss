@@ -39,4 +39,8 @@ private:
 private:
 	float TimeSinceLastTurn = 0.0f;
 	float TurnCooldown = 0.5f;
+
+	// 攻击结束后禁止转身的时间
+	float PostAttackTurnLockTime = 1.5f;
+	float TimeSinceLastAttack = 0.0f;
 };

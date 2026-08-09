@@ -47,6 +47,20 @@ void ABossAIController::Tick(float DeltaTime)
     if (!ControlledPawn || !PlayerPawn) return;
 
     ABoss_Berserker* Boss = Cast<ABoss_Berserker>(ControlledPawn);
+
+    // 检测攻击状态变化
+    if (Boss)
+    {
+        if (Boss->bIsAttacking)
+        {
+            TimeSinceLastAttack = 0.0f; // 正在攻击，清零计时
+        }
+        else
+        {
+            TimeSinceLastAttack += DeltaTime; // 攻击结束，开始计时
+        }
+    }
+
     if (!Boss || Boss->bIsAttacking || TimeSinceLastTurn < TurnCooldown) return;
 
     FVector ToPlayer = PlayerPawn->GetActorLocation() - ControlledPawn->GetActorLocation();
@@ -56,7 +70,7 @@ void ABossAIController::Tick(float DeltaTime)
     float Dot = FVector::DotProduct(Forward.GetSafeNormal(), ToPlayer.GetSafeNormal());
     float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.0f, 1.0f)));
 
-    if (Angle > 45.0f)
+    if (Angle > 45.0f && !Boss->bIsAttacking && TimeSinceLastAttack > PostAttackTurnLockTime)
     {
         IAbilitySystemInterface* ASCInterface = Cast<IAbilitySystemInterface>(ControlledPawn);
         if (ASCInterface)
@@ -66,7 +80,7 @@ void ABossAIController::Tick(float DeltaTime)
             {
                 FGameplayTagContainer TurnTag;
                 TurnTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Boss.Turn")));
-                if (ASC->TryActivateAbilitiesByTag(TurnTag))
+                if (ASC->TryActivateAbilitiesByTag(TurnTag) && TimeSinceLastTurn > TurnCooldown)
                     TimeSinceLastTurn = 0.0f;
             }
         }

@@ -1,5 +1,6 @@
 #include "Boss/GA_TurnToFace.h"
 #include "Boss/Boss_Berserker.h"
+#include "Boss/BossAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
@@ -47,23 +48,56 @@ void UGA_TurnToFace::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(Dot, -1.0f, 1.0f)));
     FVector Cross = FVector::CrossProduct(MyForward, ToPlayer);
     float SignedAngle = (Cross.Z < 0) ? -Angle : Angle;
-
-    // 3. 选择蒙太奇
-    UAnimMontage* PlayMontage = nullptr;
     const float AbsAngle = FMath::Abs(SignedAngle);
-
-    if (AbsAngle < 30.0f)
+     
+    // 新的角度阈值
+    if (AbsAngle < 15.0f)
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
         return;
     }
-    else if (AbsAngle < 120.0f)
+
+    // 2. 获取当前阶段
+    int32 CurrentPhase = 1;
+    if (ABoss_Berserker* Boss = Cast<ABoss_Berserker>(Avatar))
     {
-        PlayMontage = (SignedAngle > 0) ? TurnRight90 : TurnLeft90;
+        if (UBossAttributeSet* AttrSet = Boss->GetBossAttributeSet())
+        {
+            CurrentPhase = FMath::RoundToInt(AttrSet->GetPhase());
+        }
     }
-    else
+
+    // 3. 根据阶段和角度选择对应的蒙太奇
+    UAnimMontage* PlayMontage = nullptr;
+    bool bIsPhase2 = (CurrentPhase == 2);
+
+    if (AbsAngle < 60.0f) // 45° 动画
     {
-        PlayMontage = (SignedAngle > 0) ? TurnRight180 : TurnLeft180;
+        if (SignedAngle > 0)
+            PlayMontage = bIsPhase2 ? TurnRight45_P2 : TurnRight45;
+        else
+            PlayMontage = bIsPhase2 ? TurnLeft45_P2 : TurnLeft45;
+    }
+    else if (AbsAngle < 110.0f) // 90° 动画
+    {
+        if (SignedAngle > 0)
+            PlayMontage = bIsPhase2 ? TurnRight90_P2 : TurnRight90;
+        else
+            PlayMontage = bIsPhase2 ? TurnLeft90_P2 : TurnLeft90;
+    }
+    else if (AbsAngle < 150.0f) // 135° 动画
+    {
+        if (SignedAngle > 0)
+            PlayMontage = bIsPhase2 ? TurnRight135_P2 : TurnRight135;
+        else
+            PlayMontage = bIsPhase2 ? TurnLeft135_P2 : TurnLeft135;
+    }
+    else // 180° 动画
+    {
+        if (SignedAngle > 0)
+            PlayMontage = bIsPhase2 ? TurnRight180_P2 : TurnRight180;
+        else
+            PlayMontage = bIsPhase2 ? TurnLeft180_P2 : TurnLeft180;
     }
 
     if (!PlayMontage)
@@ -91,5 +125,3 @@ void UGA_TurnToFace::OnTurnMontageInterrupted()
 {
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
-
-// EndAbility 在基类中已有，会自动清除 bIsAttacking

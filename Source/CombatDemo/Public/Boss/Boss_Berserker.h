@@ -54,14 +54,16 @@ public:
 	// 是否正在执行攻击
 	UPROPERTY(BlueprintReadOnly, Category = "Boss|State")
 	bool bIsAttacking = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|GAS")
+	UAbilitySystemComponent* AbilitySystemComponent;
 protected:
 	virtual void BeginPlay() override;
 
 	// 当前是否已经执行过转阶段（防止重复触发）
 	bool bPhaseTransitioned = false;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Boss|GAS")
-	UAbilitySystemComponent* AbilitySystemComponent;
+
 
 	UPROPERTY()
 	UBossAttributeSet* BossAttributeSet;

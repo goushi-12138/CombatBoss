@@ -1,27 +1,57 @@
+// AnimInstance_Boss.cpp
+
 #include "Boss/AnimInstance_Boss.h"
-#include "Boss/Boss_Berserker.h"
-#include "Boss/BossAttributeSet.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
-#include "Animation/AnimInstance.h" // 确保包含此头文件
-#include "BehaviorTree/BlackboardComponent.h" // 添加这一行，修复UBlackboardComponent不完整类型错误
+#include "BehaviorTree/BlackboardComponent.h"
+#include "Boss/BossAIController.h"
+
+void UAnimInstance_Boss::NativeInitializeAnimation()
+{
+    Super::NativeInitializeAnimation();
+
+    AActor* Owner = GetOwningActor();
+    if (Owner)
+    {
+        IAbilitySystemInterface* ASCInterface = Cast<IAbilitySystemInterface>(Owner);
+        if (ASCInterface)
+        {
+            AbilitySystemComponent = ASCInterface->GetAbilitySystemComponent();
+        }
+    }
+
+    PhaseTransitionTag = FGameplayTag::RequestGameplayTag(FName("Status.PhaseTransition"));
+}
 
 void UAnimInstance_Boss::NativeUpdateAnimation(float DeltaSeconds)
 {
     Super::NativeUpdateAnimation(DeltaSeconds);
 
     APawn* Pawn = TryGetPawnOwner();
-    if (!Pawn)
-    {
-        Speed = 0.0f;
-        return;
-    }
+    if (!Pawn) return;
+
+    // 1. 更新移动速度
     Speed = Pawn->GetVelocity().Size2D();
 
-	// 获取Boss的阶段信息
-    ABoss_Berserker* Boss = Cast<ABoss_Berserker>(Pawn);
-    if (Boss && Boss->GetBossAttributeSet())
+    // 2. 检查是否正在转阶段演出（GAS标签）
+    bIsPhaseTransitioning = false;
+    if (AbilitySystemComponent)
     {
-        bIsPhaseOne = (Boss->GetBossAttributeSet()->GetPhase() == 1.0f);
-	}
+        bIsPhaseTransitioning = AbilitySystemComponent->HasMatchingGameplayTag(PhaseTransitionTag);
+    }
+
+    // 3. 从黑板读取阶段信息（仅在非转阶段演出期间）
+    if (!bIsPhaseTransitioning)
+    {
+        if (ABossAIController* AIC = Cast<ABossAIController>(Pawn->GetController()))
+        {
+            if (UBlackboardComponent* BB = AIC->GetBlackboardComponent())
+            {
+                bIsPhaseOne = BB->GetValueAsBool(FName("IsPhaseOne"));
+            }
+        }
+    }
+    // 如果正在转阶段演出，保持 bIsPhaseOne 不变（维持一阶段姿势）
 }

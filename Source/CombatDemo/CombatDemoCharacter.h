@@ -63,6 +63,13 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
     TArray<TSubclassOf<UGameplayAbility>> InitialAbilities;
 
+private:
+    // 击倒状态跟踪：是否上一帧处于击倒状态
+    bool bWasStunned = false;
+
+    // 处理击倒状态变化
+    void UpdateStunnedState(float DeltaTime);
+
 public:
 
     /** Constructor */
@@ -76,7 +83,7 @@ protected:
     /** Initialize input action bindings */
     virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
     virtual void BeginPlay() override;
-
+	virtual void Tick(float DeltaTime) override;
 protected:
 
     /** Called for movement input */

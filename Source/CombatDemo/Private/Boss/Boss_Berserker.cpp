@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include <Conditions\StateTreeGameplayTagConditions.h>
 
 ABoss_Berserker::ABoss_Berserker()
 {
@@ -53,6 +54,7 @@ void ABoss_Berserker::BeginPlay()
     // 【新增】设置初始移动速度
     GetCharacterMovement()->MaxWalkSpeed = Phase1WalkSpeed;
 
+    
     // 【新增】通知AI控制器初始阶段
     if (ABossAIController* AIC = Cast<ABossAIController>(GetController()))
     {
@@ -108,23 +110,28 @@ void ABoss_Berserker::HealthChanged(const FOnAttributeChangeData& Data)
 
 void ABoss_Berserker::HandlePhaseTransition()
 {
-    // 切换移动速度
     SetMovementSpeedForPhase(2);
 
-    // 隐藏柱子（不销毁，留作碎片效果）
     if (PillarMesh)
     {
         PillarMesh->SetVisibility(false);
     }
 
-    // 通知 AI 控制器更新黑板
+    // 更新黑板阶段
     if (ABossAIController* AIC = Cast<ABossAIController>(GetController()))
     {
-        AIC->SetPhase(false); // IsPhaseOne = false
+        AIC->SetPhase(false);
     }
-
-    // 可选：播放怒吼蒙太奇（如果不用GA处理的话）
-    // 建议通过GA_PhaseTransition来处理动画
+    // 【强制激活转阶段 GA】
+    if (AbilitySystemComponent)
+    {
+        FGameplayTagContainer TagContainer; // 修复：定义 TagContainer
+        TagContainer.AddTag(FGameplayTag::RequestGameplayTag(FName("Event.Boss.PhaseTransition")));
+        AbilitySystemComponent->TryActivateAbilitiesByTag(TagContainer);
+        UE_LOG(LogTemp, Warning, TEXT("Trying to activate PhaseTransition GA"));
+        bool bSuccess = AbilitySystemComponent->TryActivateAbilitiesByTag(TagContainer);
+        UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilitiesByTag result: %d"), bSuccess);
+    }
 }
 
 void ABoss_Berserker::SetMovementSpeedForPhase(int32 NewPhase)

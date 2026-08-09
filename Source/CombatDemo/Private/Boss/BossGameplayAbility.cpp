@@ -11,7 +11,7 @@
 #include "Engine/OverlapResult.h" // 解决 FOverlapResult 不完整类型报错
 #include "Engine/EngineTypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
-
+#include "Components/CapsuleComponent.h"
 UBossGameplayAbility::UBossGameplayAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -52,13 +52,13 @@ void UBossGameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 	{
 		Boss->bIsAttacking = true;
 	}
-
+	/*
 	// 跳跃开始时，允许角色脱离地面
 	if (ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo()))
 	{
 		Character->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
 	}
-
+*/
 	// 播放蒙太奇
 	if (MontageToPlay)
 	{
@@ -155,15 +155,45 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 
 void UBossGameplayAbility::OnMontageCompleted()
 {
+	/*
 	// 跳跃结束时，恢复行走模式
 	if (ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo()))
 	{
 		Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 	}
+*/
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UBossGameplayAbility::OnMontageInterrupted()
 {
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+}
+
+void UBossGameplayAbility::SetIgnorePlayerCollision(bool bIgnore)
+{
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	ACharacter* Player = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+	if (!Avatar || !Player) return;
+
+	if (UCapsuleComponent* BossCapsule = Avatar->FindComponentByClass<UCapsuleComponent>())
+	{
+		if (bIgnore)
+		{
+			// 双向忽略，确保不会踩头
+			BossCapsule->MoveIgnoreActors.AddUnique(Player);
+			if (UCapsuleComponent* PlayerCapsule = Player->GetCapsuleComponent())
+			{
+				BossCapsule->IgnoreComponentWhenMoving(PlayerCapsule, true);
+			}
+		}
+		else
+		{
+			BossCapsule->MoveIgnoreActors.Remove(Player);
+			if (UCapsuleComponent* PlayerCapsule = Player->GetCapsuleComponent())
+			{
+				BossCapsule->IgnoreComponentWhenMoving(PlayerCapsule, false);
+			}
+		}
+	}
 }

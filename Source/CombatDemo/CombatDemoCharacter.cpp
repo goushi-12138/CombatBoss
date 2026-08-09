@@ -52,6 +52,8 @@ void ACombatDemoCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    SetActorTickEnabled(true);
+
     // 初始化 GAS
     AbilitySystemComponent->InitAbilityActorInfo(this, this);
 
@@ -67,6 +69,13 @@ void ACombatDemoCharacter::BeginPlay()
             AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, INDEX_NONE, this));
         }
     }
+}
+
+void ACombatDemoCharacter::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+
+    UpdateStunnedState(DeltaSeconds);
 }
 
 void ACombatDemoCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -108,6 +117,11 @@ void ACombatDemoCharacter::Look(const FInputActionValue& Value)
 void ACombatDemoCharacter::OnAttackPressed()
 {
     if (!AbilitySystemComponent) return;
+
+    // 击倒期间禁止攻击
+    FGameplayTag StunnedTag = FGameplayTag::RequestGameplayTag(FName("Status.Stunned"));
+    if (AbilitySystemComponent->HasMatchingGameplayTag(StunnedTag))
+        return;
 
     // 1. 先尝试激活连招 GA（首次攻击或上一轮已结束）
     FGameplayTagContainer AttackTag;
@@ -175,4 +189,54 @@ float ACombatDemoCharacter::TakeDamage(float Damage, FDamageEvent const& DamageE
     }
 
     return Damage;
+}
+
+void ACombatDemoCharacter::UpdateStunnedState(float DeltaTime)
+{
+    if (!AbilitySystemComponent)
+        return;
+
+    // 检查当前是否拥有击倒标签
+    FGameplayTag StunnedTag = FGameplayTag::RequestGameplayTag(FName("Status.Stunned"));
+    bool bIsStunnedNow = AbilitySystemComponent->HasMatchingGameplayTag(StunnedTag);
+
+    // 仅在状态变化时处理
+    if (bIsStunnedNow != bWasStunned)
+    {
+        bWasStunned = bIsStunnedNow;
+
+        // 获取 CharacterMovement 和 Controller
+        UCharacterMovementComponent* MovementComp = GetCharacterMovement();
+        APlayerController* PC = Cast<APlayerController>(GetController());
+
+        if (bIsStunnedNow)
+        {
+            // 进入击倒：禁用移动和输入
+            if (MovementComp)
+            {
+                MovementComp->SetMovementMode(MOVE_None);
+            }
+            if (PC)
+            {
+                // 禁用输入（包括移动、跳跃、攻击等）
+                PC->SetIgnoreLookInput(true);
+                PC->SetIgnoreMoveInput(true);
+                // 也可以使用 DisableInput(PC) 但 SetIgnore 更精细
+            }
+        }
+        else
+        {
+            // 恢复：启用移动和输入
+            if (MovementComp)
+            {
+                MovementComp->SetMovementMode(MOVE_Walking);
+            }
+            if (PC)
+            {
+                PC->ResetIgnoreLookInput();
+                PC->ResetIgnoreMoveInput();
+                // 如果使用了 DisableInput，则用 EnableInput(PC)
+            }
+        }
+    }
 }

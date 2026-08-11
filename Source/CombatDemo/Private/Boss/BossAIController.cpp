@@ -33,6 +33,11 @@ void ABossAIController::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    APawn* ControlledPawn = GetPawn();
+    if (!ControlledPawn) return;
+
+    APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
+
     TimeSinceLastUpdate += DeltaTime;
     if (TimeSinceLastUpdate >= UpdateInterval)
     {
@@ -42,8 +47,6 @@ void ABossAIController::Tick(float DeltaTime)
 
     TimeSinceLastTurn += DeltaTime;
 
-    APawn* ControlledPawn = GetPawn();
-    APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0);
     if (!ControlledPawn || !PlayerPawn) return;
 
     ABoss_Berserker* Boss = Cast<ABoss_Berserker>(ControlledPawn);
@@ -106,6 +109,11 @@ void ABossAIController::UpdateBlackboard()
 
         const float Dist = FVector::Dist(PlayerLocation, ControlledPawn->GetActorLocation());
         Blackboard->SetValueAsFloat(FName("DistanceToPlayer"), Dist);
+
+        if (ABoss_Berserker* Boss = Cast<ABoss_Berserker>(GetPawn()))
+        {
+            Blackboard->SetValueAsBool(FName("bIsAttacking"), Boss->bIsAttacking);
+        }
     }
 }
 

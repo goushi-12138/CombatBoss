@@ -29,14 +29,9 @@ public:
     // 【新增】是否正在播放转阶段蒙太奇（用于锁定阶段）
     UPROPERTY(BlueprintReadOnly, Category = "Animation")
     bool bIsPhaseTransitioning = false;
-
 private:
     UPROPERTY()
     UAbilitySystemComponent* AbilitySystemComponent;
-
-    // 缓存上次旋转值，用于转身动画（现在已由GA驱动，可保留但不使用）
-    float PreviousYaw = 0.0f;
-    bool bHasPreviousYaw = false;
 
     // 缓存标记
     FGameplayTag PhaseTransitionTag;

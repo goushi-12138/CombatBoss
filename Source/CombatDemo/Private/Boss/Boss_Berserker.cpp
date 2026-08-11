@@ -128,9 +128,6 @@ void ABoss_Berserker::HandlePhaseTransition()
         FGameplayTagContainer TagContainer; // ÐÞ¸´£º¶¨Òå TagContainer
         TagContainer.AddTag(FGameplayTag::RequestGameplayTag(FName("Event.Boss.PhaseTransition")));
         AbilitySystemComponent->TryActivateAbilitiesByTag(TagContainer);
-        UE_LOG(LogTemp, Warning, TEXT("Trying to activate PhaseTransition GA"));
-        bool bSuccess = AbilitySystemComponent->TryActivateAbilitiesByTag(TagContainer);
-        UE_LOG(LogTemp, Warning, TEXT("TryActivateAbilitiesByTag result: %d"), bSuccess);
     }
 }
 
@@ -143,5 +140,18 @@ void ABoss_Berserker::SetMovementSpeedForPhase(int32 NewPhase)
     else
     {
         GetCharacterMovement()->MaxWalkSpeed = Phase2RunSpeed;
+    }
+}
+
+void ABoss_Berserker::OnDeath()
+{
+    if (bIsDead) return;
+    bIsDead = true;
+
+    if (AbilitySystemComponent)
+    {
+        FGameplayTagContainer DeathTag;
+        DeathTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Event.Boss.Death")));
+        AbilitySystemComponent->TryActivateAbilitiesByTag(DeathTag);
     }
 }

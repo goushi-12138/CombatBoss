@@ -4,9 +4,9 @@
 
 UBossAttributeSet::UBossAttributeSet()
 {
-	MaxHealth = 1000.0f;
-	Health = 1000.0f;
-	Phase = 1.0f;
+    MaxHealth = 1000.0f;
+    Health = 1000.0f;
+    Phase = 1.0f;
 }
 
 void UBossAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
@@ -15,24 +15,32 @@ void UBossAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallba
 
     if (Data.EvaluatedData.Attribute == GetHealthAttribute())
     {
+        if (bIsDead) return;
+
         const float NewHealth = GetHealth();
         const float MaxH = GetMaxHealth();
         const float CurrentPhase = GetPhase();
 
-        // 血量归零检查
         if (NewHealth <= 0.0f)
         {
+            bIsDead = true;
             SetHealth(0.0f);
-            // 触发死亡事件（可选）
+
+            if (AActor* Owner = GetOwningActor())
+            {
+                if (ABoss_Berserker* Boss = Cast<ABoss_Berserker>(Owner))
+                {
+                    Boss->OnDeath();
+                }
+            }
             return;
         }
 
-        // 阶段切换：血量低于50%且仍在一阶段
+        // 阶段切换
         if (CurrentPhase == 1.0f && NewHealth <= MaxH * 0.5f)
         {
             SetPhase(2.0f);
 
-            // 通知Boss执行阶段切换
             if (AActor* Owner = GetOwningActor())
             {
                 if (ABoss_Berserker* Boss = Cast<ABoss_Berserker>(Owner))
@@ -41,13 +49,13 @@ void UBossAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallba
                 }
             }
 
-            // 【新增】向自身发送阶段切换GameplayEvent，用于触发转阶段GA
             if (AActor* Owner = GetOwningActor())
             {
                 if (UAbilitySystemComponent* ASC = Owner->FindComponentByClass<UAbilitySystemComponent>())
                 {
                     FGameplayEventData EventData;
-                    ASC->HandleGameplayEvent(FGameplayTag::RequestGameplayTag(FName("Event.Boss.PhaseTransition")), &EventData);
+                    ASC->HandleGameplayEvent(
+                        FGameplayTag::RequestGameplayTag(FName("Event.Boss.PhaseTransition")), &EventData);
                 }
             }
         }

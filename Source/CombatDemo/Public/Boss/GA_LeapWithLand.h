@@ -4,6 +4,8 @@
 #include "Boss/BossGameplayAbility.h"
 #include "GA_LeapWithLand.generated.h"
 
+class UAbilitySystemComponent;
+
 UCLASS()
 class COMBATDEMO_API UGA_LeapWithLand : public UBossGameplayAbility
 {
@@ -24,7 +26,7 @@ public:
     UPROPERTY(EditDefaultsOnly, Category = "Leap|Damage")
     TSubclassOf<UGameplayEffect> DirectDamageEffect;
 
-    /** 落地击倒GE（施加StunTag） */
+    /** 落地击倒GE（保留属性兼容旧配置；本受击系统不再应用——改为播放倒地蒙太奇，无"倒地不能动"硬控） */
     UPROPERTY(EditDefaultsOnly, Category = "Leap|Damage")
     TSubclassOf<UGameplayEffect> StunEffect;
 protected:
@@ -52,6 +54,9 @@ private:
 
     /** 执行落地AOE */
     void ExecuteLandAOE();
+
+    /** 向玩家发送倒地事件（正对Boss→DownFront向后倒；背对Boss→DownBack向前倒） */
+    void SendDownReactEvent(UAbilitySystemComponent* TargetASC, AActor* Victim, AActor* BossAvatar);
 
     /** 是否已落地（防止重复触发） */
     bool bHasLanded = false;

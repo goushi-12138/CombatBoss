@@ -9,11 +9,11 @@
 #include "TimerManager.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
-#include "Engine/OverlapResult.h" // ��� FOverlapResult ���������ͱ���
+#include "Engine/OverlapResult.h" // 解决 FOverlapResult 不完整类型报错
 #include "Engine/EngineTypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "AbilitySystemBlueprintLibrary.h" // ����ͷ�ļ�
+#include "AbilitySystemBlueprintLibrary.h" // 添加头文件
 
 UBossGameplayAbility::UBossGameplayAbility()
 {
@@ -29,7 +29,7 @@ bool UBossGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle H
 	if (!ActorInfo || !ActorInfo->AvatarActor.IsValid())
 		return false;
 
-	// ������
+	// 距离检查
 	if (MinDistance > 0.0f || MaxDistance > 0.0f)
 	{
 		APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
@@ -51,13 +51,13 @@ void UBossGameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-	
+
 	if (ABoss_Berserker* Boss = Cast<ABoss_Berserker>(GetAvatarActorFromActorInfo()))
 	{
 		Boss->bIsAttacking = true;
 	}
 
-	// ������̫��
+	// 播放蒙太奇
 	if (MontageToPlay)
 	{
 		UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, MontageToPlay);
@@ -73,7 +73,7 @@ void UBossGameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 		return;
 	}
 
-	// �ȴ����Զ���֪ͨ�� AttackStart �� AttackEnd �¼�
+	// 等待来自动画通知的 AttackStart 和 AttackEnd 事件
 	UAbilityTask_WaitGameplayEvent* WaitStart = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this, FGameplayTag::RequestGameplayTag(FName("Event.Attack.Start")));
 	WaitStart->EventReceived.AddDynamic(this, &UBossGameplayAbility::OnAttackStartEvent);
 	WaitStart->ReadyForActivation();
@@ -83,9 +83,9 @@ void UBossGameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 	WaitEnd->ReadyForActivation();
 }
 
-void UBossGameplayAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* ActorInfo,const FGameplayAbilityActivationInfo ActivationInfo,bool bReplicateEndAbility,bool bWasCancelled)
+void UBossGameplayAbility::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
-	// ���������������״̬
+	// 【新增】清除攻击状态
 	if (ABoss_Berserker* Boss = Cast<ABoss_Berserker>(GetAvatarActorFromActorInfo()))
 	{
 		Boss->bIsAttacking = false;
@@ -98,7 +98,10 @@ void UBossGameplayAbility::OnAttackStartEvent(FGameplayEventData Payload)
 {
 	bIsAttacking = true;
 	DamagedTargets.Empty();
-	GetWorld()->GetTimerManager().SetTimer(AttackTraceTimer, this, &UBossGameplayAbility::ApplyDamageToTarget, 0.1f, true);
+
+	// 连续伤害（旋转挥砍）：使用更长的判定间隔；普通攻击保持 0.1s
+	const float TickInterval = bContinuousDamage ? RepeatDamageInterval : 0.1f;
+	GetWorld()->GetTimerManager().SetTimer(AttackTraceTimer, this, &UBossGameplayAbility::ApplyDamageToTarget, TickInterval, true);
 }
 
 void UBossGameplayAbility::OnAttackEndEvent(FGameplayEventData Payload)
@@ -138,7 +141,7 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 				UAbilitySystemComponent* TargetASC = ASCInterface->GetAbilitySystemComponent();
 				if (TargetASC)
 				{
-					// �޵м��
+					// 无敌检查
 					if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Dodging"))))
 						continue;
 
@@ -148,11 +151,89 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 						GetAbilitySystemComponentFromActorInfo()->ApplyGameplayEffectToTarget(
 							DamageEffectClass.GetDefaultObject(), TargetASC, 1.0f, EffectContext);
 						DamagedTargets.Add(Victim);
+
+						// ===== 新增：命中玩家后发送受击事件（播放受击蒙太奇）=====
+						SendHitReactEvent(Victim);
+
+						// 连续伤害（旋转挥砍）：命中后立即从已伤害列表移除，
+						// 使下一次伤害判定（RepeatDamageInterval 后）可再次命中同一目标 → 每tick受伤+受击
+						if (bContinuousDamage)
+						{
+							DamagedTargets.Remove(Victim);
+						}
+						// ===== 新增结束 =====
 					}
 				}
 			}
 		}
 	}
+}
+
+void UBossGameplayAbility::SendHitReactEvent(AActor* Victim)
+{
+	if (!Victim) return;
+
+	IAbilitySystemInterface* ASCI = Cast<IAbilitySystemInterface>(Victim);
+	UAbilitySystemComponent* TargetASC = ASCI ? ASCI->GetAbilitySystemComponent() : nullptr;
+	if (!TargetASC)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[BossGA] SendHitReactEvent: Victim has no ASC! Victim=%s"), *GetNameSafe(Victim));
+		return;
+	}
+
+	// 防御中/无敌中不播放受击（伤害照常施加，防御减伤逻辑可后续自行扩展）
+	if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking"))))
+		return;
+	if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Dodging"))))
+		return;
+
+	const FGameplayTag DirectionTag = GetHitReactDirectionTag(Victim);
+	FGameplayEventData EventData;
+	EventData.Instigator = GetAvatarActorFromActorInfo();
+	EventData.Target = Victim;
+	EventData.EventTag = DirectionTag;
+	TargetASC->HandleGameplayEvent(DirectionTag, &EventData);
+
+	UE_LOG(LogTemp, Log, TEXT("[BossGA] SendHitReactEvent -> Direction=%s, Victim=%s"),
+		*DirectionTag.ToString(), *GetNameSafe(Victim));
+}
+
+FGameplayTag UBossGameplayAbility::GetHitReactDirectionTag(AActor* Victim) const
+{
+	// 1. 优先使用蓝图中配置的固定方向
+	switch (HitReactDirection)
+	{
+	case EBossHitReactDirection::Front:
+		return FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Front"));
+	case EBossHitReactDirection::Back:
+		return FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Back"));
+	case EBossHitReactDirection::Left:
+		return FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Left"));
+	case EBossHitReactDirection::Right:
+		return FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Right"));
+	default:
+		break;
+	}
+
+	// 2. FromBoss：根据 Boss→玩家 方向相对玩家朝向动态计算
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!Avatar || !Victim)
+		return FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Front"));
+
+	const FVector AttackDir = (Victim->GetActorLocation() - Avatar->GetActorLocation()).GetSafeNormal2D();
+	const FVector PlayerForward = Victim->GetActorForwardVector().GetSafeNormal2D();
+	const FVector PlayerRight = Victim->GetActorRightVector().GetSafeNormal2D();
+
+	const float DotF = FVector::DotProduct(AttackDir, PlayerForward);
+	if (DotF > 0.3f)
+		return FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Front"));  // 攻击来自前方 → 向后倒
+	if (DotF < -0.3f)
+		return FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Back"));   // 攻击来自后方 → 向前倒
+
+	const float DotR = FVector::DotProduct(AttackDir, PlayerRight);
+	return DotR > 0.0f
+		? FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Left"))         // 攻击来自右方 → 向左倒
+		: FGameplayTag::RequestGameplayTag(FName("Event.Player.Hit.Right"));       // 攻击来自左方 → 向右倒
 }
 
 void UBossGameplayAbility::OnMontageCompleted()
@@ -175,7 +256,7 @@ void UBossGameplayAbility::SetIgnorePlayerCollision(bool bIgnore)
 	{
 		if (bIgnore)
 		{
-			// ˫����ԣ�ȷ�������ͷ
+			// 双向忽略，确保不会踩头
 			BossCapsule->MoveIgnoreActors.AddUnique(Player);
 			if (UCapsuleComponent* PlayerCapsule = Player->GetCapsuleComponent())
 			{

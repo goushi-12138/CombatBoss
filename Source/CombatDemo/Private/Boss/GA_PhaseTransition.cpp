@@ -9,8 +9,11 @@
 UGA_PhaseTransition::UGA_PhaseTransition()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
     // 正确方式：添加到 AbilityTags，才能被事件激活
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Event.Boss.PhaseTransition")));
+    FGameplayTagContainer TagContainer;
+    TagContainer.AddTag(FGameplayTag::RequestGameplayTag(FName("Event.Boss.PhaseTransition")));
+    SetAssetTags(TagContainer);
 }
 
 bool UGA_PhaseTransition::CanActivateAbility(

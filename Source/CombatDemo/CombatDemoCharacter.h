@@ -37,6 +37,15 @@ class ACombatDemoCharacter : public ACharacter, public IAbilitySystemInterface
     UPlayerAttributeSet* PlayerAttributeSet;
     // ========== GAS 组件结束 ==========
 
+    // 在 ACombatDemoCharacter 的 public 或 protected 区域添加
+public:
+    /** 右手斧头组件 */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
+    UStaticMeshComponent* AxeMesh;
+
+    /** 左手盾牌组件 */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
+    UStaticMeshComponent* ShieldMesh;
 protected:
 
     /** Jump Input Action */
@@ -58,6 +67,14 @@ protected:
     /** Attack Input Action — 新增 */
     UPROPERTY(EditAnywhere, Category = "Input")
     UInputAction* AttackAction;
+
+    /** Block Input Action */
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* BlockAction;
+
+    /** Called for block input */
+    void OnBlockPressed();
+    void OnBlockReleased();
 
     /** 初始技能 */
     UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
@@ -112,6 +129,19 @@ public:
     /** Handles jump pressed inputs from either controls or UI interfaces */
     UFUNCTION(BlueprintCallable, Category = "Input")
     virtual void DoJumpEnd();
+    // 翻滚方向（由输入设置，GA读取）
+public:
+    FVector DodgeDirection;
+
+protected:
+    /** Dodge Input Action */
+    UPROPERTY(EditAnywhere, Category = "Input")
+    UInputAction* DodgeAction;
+
+    void OnDodgePressed(const FInputActionValue& Value);
+    void UpdateDodgeDirection();
+
+    FVector2D LastMovementInput;
 
 public:
 

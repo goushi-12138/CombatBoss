@@ -12,7 +12,6 @@
 UGA_LeapWithLand::UGA_LeapWithLand()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-    // 此GA通过行为树的Tag激活，具体Tag在蓝图中设置（如 Ability.Boss.P1_Leap）
 }
 
 void UGA_LeapWithLand::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -31,6 +30,11 @@ void UGA_LeapWithLand::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
         return;
+    }
+
+    if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+    {
+        ASC->AddLooseGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.LeapAttack")));
     }
 
     // 跳跃开始时，允许角色脱离地面
@@ -167,6 +171,11 @@ void UGA_LeapWithLand::EndAbility(const FGameplayAbilitySpecHandle Handle,
     {
         SetIgnorePlayerCollision(false);
         bCollisionIgnored = false;
+    }
+
+    if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+    {
+        ASC->RemoveLooseGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.LeapAttack")));
     }
 
     // 跳跃结束时，恢复行走模式

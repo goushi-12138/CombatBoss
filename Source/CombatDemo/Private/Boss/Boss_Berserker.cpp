@@ -45,9 +45,6 @@ void ABoss_Berserker::BeginPlay()
     AbilitySystemComponent->SetNumericAttributeBase(UBossAttributeSet::GetHealthAttribute(), 1000.0f);
     AbilitySystemComponent->SetNumericAttributeBase(UBossAttributeSet::GetPhaseAttribute(), 1.0f);
 
-    // 【新增】绑定属性变化回调
-    BindAttributeChangeCallbacks();
-
     // 将柱子附加到右手 Socket
     PillarMesh->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("hand_r_Socket"));
 
@@ -95,27 +92,9 @@ void ABoss_Berserker::OnPhaseChanged()
     HandlePhaseTransition();
 }
 
-void ABoss_Berserker::BindAttributeChangeCallbacks()
-{
-	if (AbilitySystemComponent && BossAttributeSet)
-	{
-		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UBossAttributeSet::GetHealthAttribute()).AddUObject(this, &ABoss_Berserker::HealthChanged);
-	}
-}
-
-void ABoss_Berserker::HealthChanged(const FOnAttributeChangeData& Data)
-{
-	// 属性集里的 PostGameplayEffectExecute 已经处理了阶段切换，这里可以做一些 UI 或动画反馈
-}
-
 void ABoss_Berserker::HandlePhaseTransition()
 {
     SetMovementSpeedForPhase(2);
-
-    if (PillarMesh)
-    {
-        PillarMesh->SetVisibility(false);
-    }
 
     // 更新黑板阶段
     if (ABossAIController* AIC = Cast<ABossAIController>(GetController()))

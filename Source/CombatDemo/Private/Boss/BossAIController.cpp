@@ -5,7 +5,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Character.h"
 #include "Boss/Boss_Berserker.h"
-#include "AbilitySystemComponent.h" // 添加此头文件以解决UAbilitySystemComponent不完整类型问题
+#include "AbilitySystemComponent.h" 
 
 ABossAIController::ABossAIController()
 {
@@ -88,7 +88,6 @@ void ABossAIController::Tick(float DeltaTime)
             }
         }
     }
-    UE_LOG(LogTemp, Warning, TEXT("[TurnCheck] Angle: %.2f, bIsAttacking: %d, Cooldown: %.2f"), Angle, Boss->bIsAttacking, TimeSinceLastTurn);
 }
 
 void ABossAIController::UpdateBlackboard()

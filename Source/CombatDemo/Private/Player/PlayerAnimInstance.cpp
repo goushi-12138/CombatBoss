@@ -35,4 +35,11 @@ void UPlayerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     {
         bIsStunned = AbilitySystemComponent->HasMatchingGameplayTag(StunnedTag);
     }
+
+    if (AbilitySystemComponent)
+    {
+        bIsStunned = AbilitySystemComponent->HasMatchingGameplayTag(StunnedTag);
+        bIsBlocking = AbilitySystemComponent->HasMatchingGameplayTag(
+            FGameplayTag::RequestGameplayTag(FName("Status.Blocking")));
+    }
 }

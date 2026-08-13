@@ -10,7 +10,9 @@
 UGA_BossDeath::UGA_BossDeath()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Event.Boss.Death")));
+    FGameplayTagContainer TagContainer;
+    TagContainer.AddTag(FGameplayTag::RequestGameplayTag(FName("Event.Boss.Death")));
+    SetAssetTags(TagContainer);
     ActivationBlockedTags.Reset();
     CancelAbilitiesWithTag.Reset();
     BlockAbilitiesWithTag.Reset();

@@ -27,7 +27,6 @@ public:
     /** ÂäµØ»÷µ¹GE£¨Ê©¼ÓStunTag£© */
     UPROPERTY(EditDefaultsOnly, Category = "Leap|Damage")
     TSubclassOf<UGameplayEffect> StunEffect;
-
 protected:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         const FGameplayAbilityActorInfo* ActorInfo,

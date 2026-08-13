@@ -25,6 +25,8 @@ public:
     UPROPERTY(BlueprintReadOnly, Category = "Animation")
     bool bIsInAir = false;
 
+    UPROPERTY(BlueprintReadOnly, Category = "Animation")
+    bool bIsBlocking = false;
 private:
     UPROPERTY()
     UAbilitySystemComponent* AbilitySystemComponent;

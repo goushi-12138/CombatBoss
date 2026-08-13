@@ -59,10 +59,4 @@ private:
 
     bool bPhaseTransitioned = false;
     bool bIsDead = false;
-
-	// 用于绑定属性变化回调
-	void BindAttributeChangeCallbacks();
-	// 修正声明，类型为 const FOnAttributeChangeData&
-	virtual void HealthChanged(const FOnAttributeChangeData& Data);
-
 };

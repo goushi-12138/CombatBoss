@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
+#include "GameplayEffectTypes.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "TimerManager.h"
@@ -12,9 +13,12 @@
 #include "Engine/EngineTypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "AbilitySystemBlueprintLibrary.h" // 添加头文件
+
 UBossGameplayAbility::UBossGameplayAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
 }
 
 bool UBossGameplayAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
@@ -52,13 +56,7 @@ void UBossGameplayAbility::ActivateAbility(const FGameplayAbilitySpecHandle Hand
 	{
 		Boss->bIsAttacking = true;
 	}
-	/*
-	// 跳跃开始时，允许角色脱离地面
-	if (ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo()))
-	{
-		Character->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
-	}
-*/
+
 	// 播放蒙太奇
 	if (MontageToPlay)
 	{
@@ -99,7 +97,7 @@ void UBossGameplayAbility::EndAbility(const FGameplayAbilitySpecHandle Handle,co
 void UBossGameplayAbility::OnAttackStartEvent(FGameplayEventData Payload)
 {
 	bIsAttacking = true;
-	DamagedTargets.Empty();  // 【新增】
+	DamagedTargets.Empty();
 	GetWorld()->GetTimerManager().SetTimer(AttackTraceTimer, this, &UBossGameplayAbility::ApplyDamageToTarget, 0.1f, true);
 }
 
@@ -131,22 +129,26 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 		for (const FOverlapResult& Result : Overlaps)
 		{
 			AActor* Victim = Result.GetActor();
-
-			// 【新增】跳过已伤害过的目标
-			if (!Victim || Victim == Avatar || DamagedTargets.Contains(Victim))
-				continue;
+			if (!Victim || Victim == Avatar) continue;
+			if (DamagedTargets.Contains(Victim)) continue;
 
 			IAbilitySystemInterface* ASCInterface = Cast<IAbilitySystemInterface>(Victim);
 			if (ASCInterface)
 			{
 				UAbilitySystemComponent* TargetASC = ASCInterface->GetAbilitySystemComponent();
-				if (TargetASC && DamageEffectClass)
+				if (TargetASC)
 				{
-					FGameplayEffectContextHandle EffectContext = GetAbilitySystemComponentFromActorInfo()->MakeEffectContext();
-					GetAbilitySystemComponentFromActorInfo()->ApplyGameplayEffectToTarget(
-						DamageEffectClass.GetDefaultObject(), TargetASC, 1.0f, EffectContext);
+					// 无敌检查
+					if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Dodging"))))
+						continue;
 
-					DamagedTargets.Add(Victim);  // 【新增】
+					if (DamageEffectClass)
+					{
+						FGameplayEffectContextHandle EffectContext = GetAbilitySystemComponentFromActorInfo()->MakeEffectContext();
+						GetAbilitySystemComponentFromActorInfo()->ApplyGameplayEffectToTarget(
+							DamageEffectClass.GetDefaultObject(), TargetASC, 1.0f, EffectContext);
+						DamagedTargets.Add(Victim);
+					}
 				}
 			}
 		}
@@ -155,13 +157,6 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 
 void UBossGameplayAbility::OnMontageCompleted()
 {
-	/*
-	// 跳跃结束时，恢复行走模式
-	if (ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo()))
-	{
-		Character->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
-	}
-*/
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 

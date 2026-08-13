@@ -39,6 +39,16 @@ ACombatDemoCharacter::ACombatDemoCharacter()
     FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
     FollowCamera->bUsePawnControlRotation = false;
 
+    // 创建斧头组件，挂接到右手 Socket
+    AxeMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AxeMesh"));
+    AxeMesh->SetupAttachment(GetMesh(), FName("AxeSocket"));
+    AxeMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 武器一般不需要碰撞，用伤害判定
+
+    // 创建盾牌组件，挂接到左手 Socket
+    ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
+    ShieldMesh->SetupAttachment(GetMesh(), FName("ShieldSocket"));
+    ShieldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 盾牌如果需要碰撞挡子弹可以开启，此处先关闭
+
     // ========== 创建 GAS 组件 ==========
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 }
@@ -95,6 +105,12 @@ void ACombatDemoCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 
         // Attack — 新增
         EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &ACombatDemoCharacter::OnAttackPressed);
+
+        EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Started, this, &ACombatDemoCharacter::OnBlockPressed);
+        EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Completed, this, &ACombatDemoCharacter::OnBlockReleased);
+
+        // Dodging
+        EnhancedInputComponent->BindAction(DodgeAction, ETriggerEvent::Started, this, &ACombatDemoCharacter::OnDodgePressed);
     }
     else
     {
@@ -105,6 +121,7 @@ void ACombatDemoCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 void ACombatDemoCharacter::Move(const FInputActionValue& Value)
 {
     FVector2D MovementVector = Value.Get<FVector2D>();
+    LastMovementInput = MovementVector;
     DoMove(MovementVector.X, MovementVector.Y);
 }
 
@@ -238,5 +255,69 @@ void ACombatDemoCharacter::UpdateStunnedState(float DeltaTime)
                 // 如果使用了 DisableInput，则用 EnableInput(PC)
             }
         }
+    }
+}
+
+void ACombatDemoCharacter::OnBlockPressed()
+{
+    if (!AbilitySystemComponent) return;
+
+    // 检查是否已经处于防御状态，防止重复激活
+    FGameplayTag BlockingTag = FGameplayTag::RequestGameplayTag(FName("Status.Blocking"));
+    if (AbilitySystemComponent->HasMatchingGameplayTag(BlockingTag))
+        return;
+
+    // 激活防御 GA
+    FGameplayTagContainer BlockTag;
+    BlockTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
+    AbilitySystemComponent->TryActivateAbilitiesByTag(BlockTag);
+}
+
+void ACombatDemoCharacter::OnBlockReleased()
+{
+    if (!AbilitySystemComponent) return;
+
+    // 取消所有带有 Ability.Player.Block 标签的技能
+    FGameplayTagContainer BlockTag;
+    BlockTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
+    AbilitySystemComponent->CancelAbilities(&BlockTag);
+}
+
+void ACombatDemoCharacter::OnDodgePressed(const FInputActionValue& Value)
+{
+    if (!AbilitySystemComponent) return;
+
+    // 根据当前移动输入设置翻滚方向，如果没有移动输入则默认向前
+    UpdateDodgeDirection();
+
+    // 激活翻滚GA
+    FGameplayTagContainer DodgeTag;
+    DodgeTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Dodge")));
+    AbilitySystemComponent->TryActivateAbilitiesByTag(DodgeTag);
+}
+
+void ACombatDemoCharacter::UpdateDodgeDirection()
+{
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (!PC)
+    {
+        DodgeDirection = GetActorForwardVector().GetSafeNormal2D();
+        return;
+    }
+
+    FRotator ControlRotation = PC->GetControlRotation();
+    FRotator YawRotation(0.0f, ControlRotation.Yaw, 0.0f);
+    FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+    FVector Right = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+    // 根据最后的移动输入组合方向
+    if (LastMovementInput.IsNearlyZero())
+    {
+        // 没有输入时默认视角前方
+        DodgeDirection = Forward;
+    }
+    else
+    {
+        DodgeDirection = (Forward * LastMovementInput.Y + Right * LastMovementInput.X).GetSafeNormal2D();
     }
 }

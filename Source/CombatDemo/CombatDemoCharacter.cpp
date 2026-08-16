@@ -39,17 +39,17 @@ ACombatDemoCharacter::ACombatDemoCharacter()
     FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
     FollowCamera->bUsePawnControlRotation = false;
 
-    // ´´½¨¸«Í·×é¼ş£¬¹Ò½Óµ½ÓÒÊÖ Socket
+    // åˆ›å»ºæ–§å¤´ç»„ä»¶ï¼ŒæŒ‚æ¥åˆ°å³æ‰‹ Socket
     AxeMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AxeMesh"));
     AxeMesh->SetupAttachment(GetMesh(), FName("AxeSocket"));
-    AxeMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // ÎäÆ÷Ò»°ã²»ĞèÒªÅö×²£¬ÓÃÉËº¦ÅĞ¶¨
+    AxeMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // æ­¦å™¨ä¸€èˆ¬ä¸éœ€è¦ç¢°æ’ï¼Œç”¨ä¼¤å®³åˆ¤å®š
 
-    // ´´½¨¶ÜÅÆ×é¼ş£¬¹Ò½Óµ½×óÊÖ Socket
+    // åˆ›å»ºç›¾ç‰Œç»„ä»¶ï¼ŒæŒ‚æ¥åˆ°å·¦æ‰‹ Socket
     ShieldMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ShieldMesh"));
     ShieldMesh->SetupAttachment(GetMesh(), FName("ShieldSocket"));
-    ShieldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // ¶ÜÅÆÈç¹ûĞèÒªÅö×²µ²×Óµ¯¿ÉÒÔ¿ªÆô£¬´Ë´¦ÏÈ¹Ø±Õ
+    ShieldMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); // ç›¾ç‰Œå¦‚æœéœ€è¦ç¢°æ’æŒ¡å­å¼¹å¯ä»¥å¼€å¯ï¼Œæ­¤å¤„å…ˆå…³é—­
 
-    // ========== ´´½¨ GAS ×é¼ş ==========
+    // ========== åˆ›å»º GAS ç»„ä»¶ ==========
     AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 }
 
@@ -64,14 +64,14 @@ void ACombatDemoCharacter::BeginPlay()
 
     SetActorTickEnabled(true);
 
-    // ³õÊ¼»¯ GAS
+    // åˆå§‹åŒ– GAS
     AbilitySystemComponent->InitAbilityActorInfo(this, this);
 
-    // ´´½¨²¢×¢²áÊôĞÔ¼¯
+    // åˆ›å»ºå¹¶æ³¨å†Œå±æ€§é›†
     PlayerAttributeSet = NewObject<UPlayerAttributeSet>(this);
     AbilitySystemComponent->AddAttributeSetSubobject(PlayerAttributeSet);
 
-    // ¸³Óè³õÊ¼¼¼ÄÜ
+    // èµ‹äºˆåˆå§‹æŠ€èƒ½
     for (TSubclassOf<UGameplayAbility> AbilityClass : InitialAbilities)
     {
         if (AbilityClass)
@@ -103,7 +103,7 @@ void ACombatDemoCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
         EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ACombatDemoCharacter::Look);
         EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ACombatDemoCharacter::Look);
 
-        // Attack ¡ª ĞÂÔö
+        // Attack â€” æ–°å¢
         EnhancedInputComponent->BindAction(AttackAction, ETriggerEvent::Started, this, &ACombatDemoCharacter::OnAttackPressed);
 
         EnhancedInputComponent->BindAction(BlockAction, ETriggerEvent::Started, this, &ACombatDemoCharacter::OnBlockPressed);
@@ -135,24 +135,24 @@ void ACombatDemoCharacter::OnAttackPressed()
 {
     if (!AbilitySystemComponent) return;
 
-    // »÷µ¹ÆÚ¼ä½ûÖ¹¹¥»÷
+    // å‡»å€’æœŸé—´ç¦æ­¢æ”»å‡»
     FGameplayTag StunnedTag = FGameplayTag::RequestGameplayTag(FName("Status.Stunned"));
     if (AbilitySystemComponent->HasMatchingGameplayTag(StunnedTag))
         return;
 
-    // 1. ÏÈ³¢ÊÔ¼¤»îÁ¬ÕĞ GA£¨Ê×´Î¹¥»÷»òÉÏÒ»ÂÖÒÑ½áÊø£©
+    // 1. å…ˆå°è¯•æ¿€æ´»è¿æ‹› GAï¼ˆé¦–æ¬¡æ”»å‡»æˆ–ä¸Šä¸€è½®å·²ç»“æŸï¼‰
     FGameplayTagContainer AttackTag;
     AttackTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Combo")));
     bool bActivated = AbilitySystemComponent->TryActivateAbilitiesByTag(AttackTag);
 
     if (bActivated)
     {
-        // Ê×´Î¼¤»î³É¹¦
+        // é¦–æ¬¡æ¿€æ´»æˆåŠŸ
         UE_LOG(LogTemp, Warning, TEXT("[Combo] First hit or new activation"));
     }
     else
     {
-        // 2. ¼¤»îÊ§°ÜËµÃ÷ GA ÕıÔÚÔËĞĞ£¨Á¬ÕĞ´°¿ÚµÈ´ıÖĞ£©£¬·¢ËÍÊÂ¼şÍ¨ÖªËü
+        // 2. æ¿€æ´»å¤±è´¥è¯´æ˜ GA æ­£åœ¨è¿è¡Œï¼ˆè¿æ‹›çª—å£ç­‰å¾…ä¸­ï¼‰ï¼Œå‘é€äº‹ä»¶é€šçŸ¥å®ƒ
         UE_LOG(LogTemp, Warning, TEXT("[Combo] GA already active, sending ComboInput event"));
 
         FGameplayEventData EventData;
@@ -165,6 +165,17 @@ void ACombatDemoCharacter::OnAttackPressed()
 
 void ACombatDemoCharacter::DoMove(float Right, float Forward)
 {
+    // ã€å€’åœ°ç¦ç§»åŠ¨ã€‘å€’åœ°/èµ·èº«è’™å¤ªå¥‡æ’­æ”¾æœŸé—´ï¼ˆStatus.Downed æ ‡ç­¾å­˜åœ¨ï¼‰å¿½ç•¥ç§»åŠ¨è¾“å…¥ã€‚
+    // è¿™é‡Œåªæ‹¦æˆªè¾“å…¥å±‚ï¼Œä¸ä¿®æ”¹ CharacterMovement çš„ MovementModeï¼Œ
+    // ä¿è¯å€’åœ°è’™å¤ªå¥‡çš„æ ¹è¿åŠ¨ï¼ˆè¢«Bossæ‰“é£ä¸€å°æ®µè·ç¦»ï¼‰æ­£å¸¸æ’­æ”¾ã€‚
+    if (AbilitySystemComponent)
+    {
+        if (AbilitySystemComponent->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Downed"))))
+            return;
+        if (AbilitySystemComponent->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Stunned"))))
+            return;
+    }
+
     if (GetController() != nullptr)
     {
         const FRotator Rotation = GetController()->GetControlRotation();
@@ -201,8 +212,8 @@ float ACombatDemoCharacter::TakeDamage(float Damage, FDamageEvent const& DamageE
 
     if (AbilitySystemComponent && PlayerAttributeSet)
     {
-        // Í¨¹ı GAS ´¦ÀíÉËº¦£¨ĞèÒªÅäºÏÉËº¦GE£©
-        // ÕâÀïÏÈ±£ÁôÈÕÖ¾£¬ºóĞø½ÓÈëÍêÕûÉËº¦ÏµÍ³
+        // é€šè¿‡ GAS å¤„ç†ä¼¤å®³ï¼ˆéœ€è¦é…åˆä¼¤å®³GEï¼‰
+        // è¿™é‡Œå…ˆä¿ç•™æ—¥å¿—ï¼Œåç»­æ¥å…¥å®Œæ•´ä¼¤å®³ç³»ç»Ÿ
     }
 
     return Damage;
@@ -213,37 +224,37 @@ void ACombatDemoCharacter::UpdateStunnedState(float DeltaTime)
     if (!AbilitySystemComponent)
         return;
 
-    // ¼ì²éµ±Ç°ÊÇ·ñÓµÓĞ»÷µ¹±êÇ©
+    // æ£€æŸ¥å½“å‰æ˜¯å¦æ‹¥æœ‰å‡»å€’æ ‡ç­¾
     FGameplayTag StunnedTag = FGameplayTag::RequestGameplayTag(FName("Status.Stunned"));
     bool bIsStunnedNow = AbilitySystemComponent->HasMatchingGameplayTag(StunnedTag);
 
-    // ½öÔÚ×´Ì¬±ä»¯Ê±´¦Àí
+    // ä»…åœ¨çŠ¶æ€å˜åŒ–æ—¶å¤„ç†
     if (bIsStunnedNow != bWasStunned)
     {
         bWasStunned = bIsStunnedNow;
 
-        // »ñÈ¡ CharacterMovement ºÍ Controller
+        // è·å– CharacterMovement å’Œ Controller
         UCharacterMovementComponent* MovementComp = GetCharacterMovement();
         APlayerController* PC = Cast<APlayerController>(GetController());
 
         if (bIsStunnedNow)
         {
-            // ½øÈë»÷µ¹£º½ûÓÃÒÆ¶¯ºÍÊäÈë
+            // è¿›å…¥å‡»å€’ï¼šç¦ç”¨ç§»åŠ¨å’Œè¾“å…¥
             if (MovementComp)
             {
                 MovementComp->SetMovementMode(MOVE_None);
             }
             if (PC)
             {
-                // ½ûÓÃÊäÈë£¨°üÀ¨ÒÆ¶¯¡¢ÌøÔ¾¡¢¹¥»÷µÈ£©
+                // ç¦ç”¨è¾“å…¥ï¼ˆåŒ…æ‹¬ç§»åŠ¨ã€è·³è·ƒã€æ”»å‡»ç­‰ï¼‰
                 PC->SetIgnoreLookInput(true);
                 PC->SetIgnoreMoveInput(true);
-                // Ò²¿ÉÒÔÊ¹ÓÃ DisableInput(PC) µ« SetIgnore ¸ü¾«Ï¸
+                // ä¹Ÿå¯ä»¥ä½¿ç”¨ DisableInput(PC) ä½† SetIgnore æ›´ç²¾ç»†
             }
         }
         else
         {
-            // »Ö¸´£ºÆôÓÃÒÆ¶¯ºÍÊäÈë
+            // æ¢å¤ï¼šå¯ç”¨ç§»åŠ¨å’Œè¾“å…¥
             if (MovementComp)
             {
                 MovementComp->SetMovementMode(MOVE_Walking);
@@ -252,7 +263,7 @@ void ACombatDemoCharacter::UpdateStunnedState(float DeltaTime)
             {
                 PC->ResetIgnoreLookInput();
                 PC->ResetIgnoreMoveInput();
-                // Èç¹ûÊ¹ÓÃÁË DisableInput£¬ÔòÓÃ EnableInput(PC)
+                // å¦‚æœä½¿ç”¨äº† DisableInputï¼Œåˆ™ç”¨ EnableInput(PC)
             }
         }
     }
@@ -262,12 +273,12 @@ void ACombatDemoCharacter::OnBlockPressed()
 {
     if (!AbilitySystemComponent) return;
 
-    // ¼ì²éÊÇ·ñÒÑ¾­´¦ÓÚ·ÀÓù×´Ì¬£¬·ÀÖ¹ÖØ¸´¼¤»î
+    // æ£€æŸ¥æ˜¯å¦å·²ç»å¤„äºé˜²å¾¡çŠ¶æ€ï¼Œé˜²æ­¢é‡å¤æ¿€æ´»
     FGameplayTag BlockingTag = FGameplayTag::RequestGameplayTag(FName("Status.Blocking"));
     if (AbilitySystemComponent->HasMatchingGameplayTag(BlockingTag))
         return;
 
-    // ¼¤»î·ÀÓù GA
+    // æ¿€æ´»é˜²å¾¡ GA
     FGameplayTagContainer BlockTag;
     BlockTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
     AbilitySystemComponent->TryActivateAbilitiesByTag(BlockTag);
@@ -277,7 +288,7 @@ void ACombatDemoCharacter::OnBlockReleased()
 {
     if (!AbilitySystemComponent) return;
 
-    // È¡ÏûËùÓĞ´øÓĞ Ability.Player.Block ±êÇ©µÄ¼¼ÄÜ
+    // å–æ¶ˆæ‰€æœ‰å¸¦æœ‰ Ability.Player.Block æ ‡ç­¾çš„æŠ€èƒ½
     FGameplayTagContainer BlockTag;
     BlockTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
     AbilitySystemComponent->CancelAbilities(&BlockTag);
@@ -287,10 +298,10 @@ void ACombatDemoCharacter::OnDodgePressed(const FInputActionValue& Value)
 {
     if (!AbilitySystemComponent) return;
 
-    // ¸ù¾İµ±Ç°ÒÆ¶¯ÊäÈëÉèÖÃ·­¹ö·½Ïò£¬Èç¹ûÃ»ÓĞÒÆ¶¯ÊäÈëÔòÄ¬ÈÏÏòÇ°
+    // æ ¹æ®å½“å‰ç§»åŠ¨è¾“å…¥è®¾ç½®ç¿»æ»šæ–¹å‘ï¼Œå¦‚æœæ²¡æœ‰ç§»åŠ¨è¾“å…¥åˆ™é»˜è®¤å‘å‰
     UpdateDodgeDirection();
 
-    // ¼¤»î·­¹öGA
+    // æ¿€æ´»ç¿»æ»šGA
     FGameplayTagContainer DodgeTag;
     DodgeTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Dodge")));
     AbilitySystemComponent->TryActivateAbilitiesByTag(DodgeTag);
@@ -310,10 +321,10 @@ void ACombatDemoCharacter::UpdateDodgeDirection()
     FVector Forward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
     FVector Right = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-    // ¸ù¾İ×îºóµÄÒÆ¶¯ÊäÈë×éºÏ·½Ïò
+    // æ ¹æ®æœ€åçš„ç§»åŠ¨è¾“å…¥ç»„åˆæ–¹å‘
     if (LastMovementInput.IsNearlyZero())
     {
-        // Ã»ÓĞÊäÈëÊ±Ä¬ÈÏÊÓ½ÇÇ°·½
+        // æ²¡æœ‰è¾“å…¥æ—¶é»˜è®¤è§†è§’å‰æ–¹
         DodgeDirection = Forward;
     }
     else

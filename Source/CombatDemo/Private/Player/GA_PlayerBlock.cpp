@@ -1,9 +1,14 @@
 #include "Player/GA_PlayerBlock.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+#include "CombatDemoCharacter.h"
+#include "Components/StaticMeshComponent.h"
 
 UGA_PlayerBlock::UGA_PlayerBlock()
 {
@@ -12,13 +17,13 @@ UGA_PlayerBlock::UGA_PlayerBlock()
 
     ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Dodge")));
 
-    // ·ÀÓùÊ±×èÖ¹¹¥»÷
+    // é˜²å¾¡æ—¶é˜»æ­¢æ”»å‡»
     ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Combo")));
 
-    // Ìí¼Ó·ÀÓù×´Ì¬±êÇ©
+    // æ·»åŠ é˜²å¾¡çŠ¶æ€æ ‡ç­¾
     FGameplayTagContainer BlockTag;
     BlockTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking")));
-    SetAssetTags(BlockTag); // »òÕßÓÃ ActivationOwnedTags£¬ÏÂÃæÊÖ¶¯Ìí¼Ó¸üÁé»î
+    SetAssetTags(BlockTag); // æˆ–è€…ç”¨ ActivationOwnedTagsï¼Œä¸‹é¢æ‰‹åŠ¨æ·»åŠ æ›´çµæ´»
 }
 
 void UGA_PlayerBlock::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -39,31 +44,40 @@ void UGA_PlayerBlock::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         return;
     }
 
-    // Ìí¼Ó·ÀÓù×´Ì¬±êÇ©
+    // æ·»åŠ é˜²å¾¡çŠ¶æ€æ ‡ç­¾
     UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
     if (ASC)
     {
         ASC->AddLooseGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking")));
     }
 
-    // ½ûÓÃÒÆ¶¯ÊäÈë
+    // ã€ç›¾ç‰Œæ ¼æŒ¡éŸ³æ•ˆã€‘ç›‘å¬ Boss çš„ Event.Player.BlockHit äº‹ä»¶ï¼ˆBoss å‘½ä¸­é˜²å¾¡ä¸­çš„ç©å®¶æ—¶å‘é€ï¼‰
+    UAbilityTask_WaitGameplayEvent* WaitBlockHit = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
+        this, FGameplayTag::RequestGameplayTag(FName("Event.Player.BlockHit")));
+    if (WaitBlockHit)
+    {
+        WaitBlockHit->EventReceived.AddDynamic(this, &UGA_PlayerBlock::OnBlockHitEvent);
+        WaitBlockHit->ReadyForActivation();
+    }
+
+    // ç¦ç”¨ç§»åŠ¨è¾“å…¥
     APlayerController* PC = Cast<APlayerController>(Character->GetController());
     if (PC)
     {
-        // ¼ÇÂ¼µ±Ç°×´Ì¬
+        // è®°å½•å½“å‰çŠ¶æ€
         bWasMovementIgnored = PC->IsMoveInputIgnored();
         PC->SetIgnoreMoveInput(true);
     }
 
-    // Í£Ö¹ÒÆ¶¯
+    // åœæ­¢ç§»åŠ¨
     Character->GetCharacterMovement()->StopMovementImmediately();
 
-    // ²¥·Å·ÀÓùÃÉÌ«Ææ£¨Ñ­»·£©
+    // æ’­æ”¾é˜²å¾¡è’™å¤ªå¥‡ï¼ˆå¾ªç¯ï¼‰
     if (BlockMontage)
     {
         UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
             this, NAME_None, BlockMontage, 1.0f, NAME_None, true);
-        MontageTask->ReadyForActivation(); // ²»°ó¶¨½áÊø»Øµ÷£¬°´×¡ÆÚ¼ä³ÖĞø²¥·Å
+        MontageTask->ReadyForActivation(); // ä¸ç»‘å®šç»“æŸå›è°ƒï¼ŒæŒ‰ä½æœŸé—´æŒç»­æ’­æ”¾
     }
 }
 
@@ -73,14 +87,14 @@ void UGA_PlayerBlock::EndAbility(const FGameplayAbilitySpecHandle Handle,
     bool bReplicateEndAbility,
     bool bWasCancelled)
 {
-    // ÒÆ³ı·ÀÓù×´Ì¬±êÇ©
+    // ç§»é™¤é˜²å¾¡çŠ¶æ€æ ‡ç­¾
     UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
     if (ASC)
     {
         ASC->RemoveLooseGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking")));
     }
 
-    // »Ö¸´ÒÆ¶¯ÊäÈë
+    // æ¢å¤ç§»åŠ¨è¾“å…¥
     ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
     if (Character)
     {
@@ -92,4 +106,40 @@ void UGA_PlayerBlock::EndAbility(const FGameplayAbilitySpecHandle Handle,
     }
 
     Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UGA_PlayerBlock::OnBlockHitEvent(FGameplayEventData Payload)
+{
+    if (!BlockHitSound)
+    {
+        return;
+    }
+
+    ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+    if (!Character)
+    {
+        return;
+    }
+
+    // ä¼˜å…ˆæŒ‚åˆ°ç©å®¶ç›¾ç‰Œç»„ä»¶ï¼ˆShieldMeshï¼‰ï¼Œå£°éŸ³ä»ç›¾ç‰Œä½ç½®å‘å‡ºï¼›æ‰¾ä¸åˆ°åˆ™æŒ‚åˆ°ç½‘æ ¼ä½“
+    USceneComponent* AttachTarget = Character->GetMesh();
+    if (ACombatDemoCharacter* PlayerChar = Cast<ACombatDemoCharacter>(Character))
+    {
+        if (PlayerChar->ShieldMesh)
+        {
+            AttachTarget = PlayerChar->ShieldMesh;
+        }
+    }
+
+    if (AttachTarget)
+    {
+        UGameplayStatics::SpawnSoundAttached(
+            BlockHitSound,
+            AttachTarget,
+            NAME_None,
+            FVector::ZeroVector,
+            EAttachLocation::SnapToTarget,
+            true);
+        UE_LOG(LogTemp, Log, TEXT("[Block] BlockHit sound played at %s"), *AttachTarget->GetName());
+    }
 }

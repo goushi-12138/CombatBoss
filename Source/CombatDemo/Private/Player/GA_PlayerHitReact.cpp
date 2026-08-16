@@ -70,6 +70,20 @@ void UGA_PlayerHitReact::ActivateAbility(const FGameplayAbilitySpecHandle Handle
 	UE_LOG(LogTemp, Log, TEXT("[HitReact] Activated. EventTag=%s, Montage=%s, bIsActive=%d"),
 		*EventTag.ToString(), *GetNameSafe(MontageToPlay), IsActive());
 
+	// 【倒地禁移动】倒地蒙太奇（DownFront/DownBack）播放期间给玩家添加 Status.Downed 标签，
+	// 玩家移动输入（ACombatDemoCharacter::DoMove）检查该标签并忽略输入 → 倒地/起身期间不能移动。
+	// 注意：不能使用 SetMovementMode(MOVE_None)（现有 Status.Stunned 机制），
+	// 因为 MOVE_None 会阻止蒙太奇根运动，导致"被Boss打飞一小段距离"的根运动失效。
+	bIsDownMontage = (MontageToPlay == DownFront || MontageToPlay == DownBack);
+	if (bIsDownMontage)
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+		{
+			ASC->AddLooseGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Downed")));
+			UE_LOG(LogTemp, Log, TEXT("[HitReact] Down montage - added Status.Downed (movement locked until montage ends)"));
+		}
+	}
+
 	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
 	if (!Character)
 	{
@@ -116,6 +130,17 @@ void UGA_PlayerHitReact::EndAbility(const FGameplayAbilitySpecHandle Handle,
 	if (bIsEnding)
 		return;
 	bIsEnding = true;
+
+	// 【倒地禁移动】移除 Status.Downed 标签，恢复玩家移动（无论蒙太奇正常播完还是被打断）
+	if (bIsDownMontage)
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+		{
+			ASC->RemoveLooseGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Downed")));
+			UE_LOG(LogTemp, Log, TEXT("[HitReact] Down montage ended - removed Status.Downed (movement restored)"));
+		}
+		bIsDownMontage = false;
+	}
 
 	// 清理蒙太奇任务（若仍在播放则停止并触发中断回调，但已被 bIsEnding 拦截）
 	if (ActiveMontageTask && ActiveMontageTask->IsActive())

@@ -155,6 +155,18 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 						// ===== 新增：命中玩家后发送受击事件（播放受击蒙太奇）=====
 						SendHitReactEvent(Victim);
 
+						// 【盾牌格挡音效】玩家防御中（Status.Blocking）：
+						// SendHitReactEvent 内部会跳过受击动画，这里改发盾牌被击事件，
+						// 由玩家 GA_PlayerBlock 监听并在盾牌组件位置播放格挡音效。
+						if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking"))))
+						{
+							FGameplayEventData BlockEvent;
+							BlockEvent.Instigator = Avatar;
+							BlockEvent.Target = Victim;
+							TargetASC->HandleGameplayEvent(
+								FGameplayTag::RequestGameplayTag(FName("Event.Player.BlockHit")), &BlockEvent);
+						}
+
 						// 连续伤害（旋转挥砍）：命中后立即从已伤害列表移除，
 						// 使下一次伤害判定（RepeatDamageInterval 后）可再次命中同一目标 → 每tick受伤+受击
 						if (bContinuousDamage)

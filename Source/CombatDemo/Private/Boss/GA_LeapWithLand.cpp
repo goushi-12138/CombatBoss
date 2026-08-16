@@ -3,6 +3,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
+#include "GameplayEffect.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "GameFramework/Character.h"
@@ -120,10 +121,18 @@ void UGA_LeapWithLand::ExecuteLandAOE()
     {
         UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
         AActor* BossAvatar = GetAvatarActorFromActorInfo();
+
+        // 【修复秒杀】去重：OverlapMultiByObjectType 对同一 Actor 的多个碰撞组件（胶囊/网格/武器等）
+        // 会返回多个重叠结果。若不按 Actor 去重，同一个受害者会被重复结算伤害
+        // （例如 GE 10点伤害 × 20个重叠结果 = 200 → 玩家被跳劈秒杀）。
+        TArray<AActor*> HitVictims;
+
         for (const FOverlapResult& Result : Overlaps)
         {
             AActor* Victim = Result.GetActor();
             if (!Victim || Victim == BossAvatar) continue;
+            if (HitVictims.Contains(Victim)) continue;
+            HitVictims.Add(Victim);
 
             IAbilitySystemInterface* ASCI = Cast<IAbilitySystemInterface>(Victim);
             if (ASCI)
@@ -138,8 +147,21 @@ void UGA_LeapWithLand::ExecuteLandAOE()
                     // 直接伤害
                     if (DirectDamageEffect)
                     {
+                        // 【修复"扣血回弹"】若 GE 是 Duration 类型（如 GE_LeapWithLand），
+                        // 其伤害 modifier 会在 GE 持续期间生效、GE 结束时把属性恢复回应用前的值
+                        // → 表现就是"扣了血又回复"。
+                        // 这里克隆一份并强制改为 Instant，伤害永久生效。
+                        UGameplayEffect* EffectToApply = DirectDamageEffect.GetDefaultObject();
+                        if (EffectToApply->DurationPolicy != EGameplayEffectDurationType::Instant)
+                        {
+                            EffectToApply = NewObject<UGameplayEffect>(
+                                GetTransientPackage(), DirectDamageEffect, NAME_None, RF_Transient, EffectToApply);
+                            EffectToApply->DurationPolicy = EGameplayEffectDurationType::Instant;
+                            UE_LOG(LogTemp, Log, TEXT("[LeapAOE] Damage GE is duration-based, converted to Instant to prevent HP restore"));
+                        }
+
                         FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
-                        SourceASC->ApplyGameplayEffectToTarget(DirectDamageEffect.GetDefaultObject(), TargetASC, 1.0f, Ctx);
+                        SourceASC->ApplyGameplayEffectToTarget(EffectToApply, TargetASC, 1.0f, Ctx);
                     }
                     else
                     {

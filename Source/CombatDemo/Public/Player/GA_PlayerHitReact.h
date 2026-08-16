@@ -15,29 +15,29 @@ class COMBATDEMO_API UGA_PlayerHitReact : public UGameplayAbility
 public:
 	UGA_PlayerHitReact();
 
-	// ===== Ò¡»ÎÊÜ»÷ÃÉÌ«Ææ£¨Ç°ÎåÖÖ¹¥»÷£¬¾ù²»¿ª¸ùÔË¶¯£©=====
-	// ¹¥»÷À´×ÔÍæ¼ÒÇ°·½ ¡ú Ïòºóµ¹
+	// ===== æ‘‡æ™ƒå—å‡»è’™å¤ªå¥‡ï¼ˆå‰äº”ç§æ”»å‡»ï¼Œå‡ä¸å¼€æ ¹è¿åŠ¨ï¼‰=====
+	// æ”»å‡»æ¥è‡ªç©å®¶å‰æ–¹ â†’ å‘åå€’
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HitReact|Shake")
 	UAnimMontage* HitFront;
 
-	// ¹¥»÷À´×ÔÍæ¼Òºó·½ ¡ú ÏòÇ°µ¹
+	// æ”»å‡»æ¥è‡ªç©å®¶åæ–¹ â†’ å‘å‰å€’
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HitReact|Shake")
 	UAnimMontage* HitBack;
 
-	// ¹¥»÷À´×ÔÍæ¼Ò×ó·½ ¡ú ÏòÓÒµ¹
+	// æ”»å‡»æ¥è‡ªç©å®¶å·¦æ–¹ â†’ å‘å³å€’
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HitReact|Shake")
 	UAnimMontage* HitLeft;
 
-	// ¹¥»÷À´×ÔÍæ¼ÒÓÒ·½ ¡ú Ïò×óµ¹
+	// æ”»å‡»æ¥è‡ªç©å®¶å³æ–¹ â†’ å‘å·¦å€’
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HitReact|Shake")
 	UAnimMontage* HitRight;
 
-	// ===== µ¹µØÃÉÌ«Ææ£¨ÌøÅü×¨ÓÃ£¬¾ù²»¿ª¸ùÔË¶¯£©=====
-	// Íæ¼ÒÕı¶ÔBoss ¡ú Ïòºóµ¹µØ
+	// ===== å€’åœ°è’™å¤ªå¥‡ï¼ˆè·³åŠˆä¸“ç”¨ï¼Œå‡ä¸å¼€æ ¹è¿åŠ¨ï¼‰=====
+	// ç©å®¶æ­£å¯¹Boss â†’ å‘åå€’åœ°
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HitReact|Down")
 	UAnimMontage* DownFront;
 
-	// Íæ¼Ò±³¶ÔBoss ¡ú ÏòÇ°µ¹µØ
+	// ç©å®¶èƒŒå¯¹Boss â†’ å‘å‰å€’åœ°
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "HitReact|Down")
 	UAnimMontage* DownBack;
 
@@ -53,10 +53,10 @@ protected:
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
-	/** ¸ù¾İ´¥·¢ÊÂ¼ş±êÇ©Ñ¡ÔñÃÉÌ«Ææ */
+	/** æ ¹æ®è§¦å‘äº‹ä»¶æ ‡ç­¾é€‰æ‹©è’™å¤ªå¥‡ */
 	UAnimMontage* SelectMontage(const FGameplayTag& EventTag) const;
 
-	// ===== ÃÉÌ«Ææ»Øµ÷ =====
+	// ===== è’™å¤ªå¥‡å›è°ƒ =====
 	UFUNCTION()
 	void OnMontageCompleted();
 
@@ -64,8 +64,14 @@ protected:
 	void OnMontageInterrupted();
 
 private:
-	// ·ÀÖØÈë±£»¤£º±ÜÃâ EndAbility Óë OnMontageCompleted/OnMontageInterrupted »¥Ïàµ÷ÓÃµ¼ÖÂ¶ÑÕ»Òç³ö
+	// é˜²é‡å…¥ä¿æŠ¤ï¼šé¿å… EndAbility ä¸ OnMontageCompleted/OnMontageInterrupted äº’ç›¸è°ƒç”¨å¯¼è‡´å †æ ˆæº¢å‡º
 	bool bIsEnding = false;
 
 	UAbilityTask_PlayMontageAndWait* ActiveMontageTask = nullptr;
+
+	/** æœ¬æ¬¡æ’­æ”¾çš„æ˜¯å¦ä¸ºå€’åœ°è’™å¤ªå¥‡ï¼ˆDownFront/DownBackï¼‰ã€‚
+	    æ˜¯åˆ™æ’­æ”¾æœŸé—´ç»™ç©å®¶æ·»åŠ  Status.Downed æ ‡ç­¾ï¼ˆç¦æ­¢ç§»åŠ¨è¾“å…¥ï¼‰ï¼Œè’™å¤ªå¥‡ç»“æŸç§»é™¤ã€‚
+	    æ³¨æ„ï¼šä¸ä¿®æ”¹ CharacterMovement çš„ MovementModeï¼ˆMOVE_None ä¼šé˜»æ­¢è’™å¤ªå¥‡æ ¹è¿åŠ¨ï¼Œ
+	    å¯¼è‡´"è¢«æ‰“é£ä¸€å°æ®µè·ç¦»"çš„æ ¹è¿åŠ¨å¤±æ•ˆï¼‰ã€‚ */
+	bool bIsDownMontage = false;
 };

@@ -14,7 +14,7 @@ class COMBATDEMO_API UGA_PlayerDodge : public UGameplayAbility
 public:
     UGA_PlayerDodge();
 
-    // �ĸ����򷭹���̫�棨������ͼ��ָ����
+    // 四个方向翻滚蒙太奇（可在蓝图中指定）
     UPROPERTY(EditDefaultsOnly, Category = "Dodge")
     UAnimMontage* DodgeForward;
 
@@ -27,7 +27,7 @@ public:
     UPROPERTY(EditDefaultsOnly, Category = "Dodge")
     UAnimMontage* DodgeRight;
 
-    // �����޵б�ǩ�������ڼ�����
+    // 翻滚无敌标签，翻滚期间添加
     FGameplayTag InvulnerableTag;
 
 protected:
@@ -46,4 +46,14 @@ private:
     void OnMontageCompleted();
 
     UAbilityTask_PlayMontageAndWait* ActiveMontageTask;
+
+    /** 翻滚超时兜底定时器：碰撞卡住/蒙太奇循环导致回调不触发时，超时强制结束技能，
+        避免 GA 永久卡在激活状态 → 之后翻滚全部失效 */
+    FTimerHandle DodgeTimeoutHandle;
+
+    /** 超时强制结束翻滚 */
+    void ForceEndDodge();
+
+    /** 防重入：避免 EndAbility 与蒙太奇回调互相调用造成栈溢出 */
+    bool bIsEnding = false;
 };

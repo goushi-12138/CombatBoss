@@ -304,7 +304,11 @@ void ACombatDemoCharacter::OnDodgePressed(const FInputActionValue& Value)
     // 激活翻滚GA
     FGameplayTagContainer DodgeTag;
     DodgeTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Dodge")));
-    AbilitySystemComponent->TryActivateAbilitiesByTag(DodgeTag);
+    const bool bActivated = AbilitySystemComponent->TryActivateAbilitiesByTag(DodgeTag);
+    if (!bActivated)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("[Dodge] Failed to activate dodge GA! (GA可能仍处于激活/卡死状态)"));
+    }
 }
 
 void ACombatDemoCharacter::UpdateDodgeDirection()

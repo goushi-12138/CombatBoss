@@ -5,6 +5,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "TimerManager.h"
 #include <Kismet\GameplayStatics.h>
 
 UGA_PlayerDodge::UGA_PlayerDodge()
@@ -15,11 +16,11 @@ UGA_PlayerDodge::UGA_PlayerDodge()
     TagContainer.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Dodge")));
     SetAssetTags(TagContainer);
 
-    // ����ʱȡ�������ͷ���
+    // 翻滚时取消攻击和防御
     CancelAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Combo")));
     CancelAbilitiesWithTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
 
-    // �����ڼ��ֹ�������������ٴη���
+    // 翻滚期间禁止攻击、防御、再次翻滚
     ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Combo")));
     ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
     ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Dodge")));
@@ -32,6 +33,9 @@ void UGA_PlayerDodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     const FGameplayAbilityActivationInfo ActivationInfo,
     const FGameplayEventData* TriggerEventData)
 {
+    // 每次激活重置防重入标志（保证任何提前 return 路径下 EndAbility 都能正常执行清理）
+    bIsEnding = false;
+
     if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
     {
         EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -45,20 +49,20 @@ void UGA_PlayerDodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         return;
     }
 
-    // �����޵б�ǩ
+    // 添加无敌标签
     if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
     {
         ASC->AddLooseGameplayTag(InvulnerableTag);
     }
 
-    // ��ȡ��ɫ�ϴ洢�ķ��������� CombatDemoCharacter ���ã�
+    // 读取角色上存储的翻滚方向（由 CombatDemoCharacter 设置）
     FVector Direction = FVector::ZeroVector;
     if (ACombatDemoCharacter* MyChar = Cast<ACombatDemoCharacter>(Player))
     {
         Direction = MyChar->DodgeDirection;
     }
 
-    // ��ȡ��ҿ����������ڻ�ȡ�ӽǷ���
+    // 获取玩家控制器，用于获取视角方向
     APlayerController* PC = UGameplayStatics::GetPlayerController(GetWorld(), 0);
     if (!PC)
     {
@@ -66,33 +70,40 @@ void UGA_PlayerDodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         return;
     }
 
-    // ��ȡ�ӽǵ�ˮƽ����
+    // 获取视角的水平朝向
     FRotator ControlRotation = PC->GetControlRotation();
     FRotator YawRotation(0.0f, ControlRotation.Yaw, 0.0f);
     FVector CamForward = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
     FVector CamRight = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-    // ���û�з������룬Ĭ��ʹ���ӽ�ǰ����ǰ������
+    // 如果没有方向输入，默认使用视角前方（前翻滚）
     if (Direction.IsNearlyZero())
     {
         Direction = CamForward;
     }
 
-    // ���㷽�����ӽ�ǰ�����������ϵ�ͶӰ
-    float ForwardAmount = FVector::DotProduct(Direction, CamForward);
-    float RightAmount = FVector::DotProduct(Direction, CamRight);
+    // ===== 关键修复：动画选择基于"翻滚方向 相对 人物面朝方向"（永劫式闪避）=====
+    // Direction 是摄像机基准方向（W=摄像机前, S=后, D=右, A=左）。
+    // 但"前滚/后滚/左滚/右滚"动画必须以人物朝向为准：
+    // 人物面朝后、W(摄像机前)翻滚时，翻滚方向其实是人物身后 → 应播"向后翻滚"动画，
+    // 这样根运动才朝人物后 = 摄像机前（玩家看的方向）。
+    const FVector ActorForward = Player->GetActorForwardVector().GetSafeNormal2D();
+    const FVector ActorRight = Player->GetActorRightVector().GetSafeNormal2D();
+
+    const float ForwardAmount = FVector::DotProduct(Direction, ActorForward);
+    const float RightAmount = FVector::DotProduct(Direction, ActorRight);
 
     UAnimMontage* MontageToPlay = nullptr;
 
-    if (FMath::Abs(ForwardAmount) > 0.5f)
+    if (FMath::Abs(ForwardAmount) >= FMath::Abs(RightAmount))
     {
-        // ǰ����ռ����
-        MontageToPlay = (ForwardAmount > 0.0f) ? DodgeForward : DodgeBackward;
+        // 前后方向占主导
+        MontageToPlay = (ForwardAmount >= 0.0f) ? DodgeForward : DodgeBackward;
     }
     else
     {
-        // ���ҷ���ռ����
-        MontageToPlay = (RightAmount > 0.0f) ? DodgeRight : DodgeLeft;
+        // 左右方向占主导
+        MontageToPlay = (RightAmount >= 0.0f) ? DodgeRight : DodgeLeft;
     }
 
     if (!MontageToPlay)
@@ -102,16 +113,29 @@ void UGA_PlayerDodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     }
 
     ActiveMontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
-        this, NAME_None, MontageToPlay, 1.0f, NAME_None, true); // true Ӧ�ø��˶�
+        this, NAME_None, MontageToPlay, 1.0f, NAME_None, true); // true 应用根运动
     ActiveMontageTask->OnCompleted.AddDynamic(this, &UGA_PlayerDodge::OnMontageCompleted);
     ActiveMontageTask->OnInterrupted.AddDynamic(this, &UGA_PlayerDodge::OnMontageCompleted);
     ActiveMontageTask->OnCancelled.AddDynamic(this, &UGA_PlayerDodge::OnMontageCompleted);
     ActiveMontageTask->ReadyForActivation();
+
+    // 【超时兜底】对障碍物翻滚被碰撞卡住、或蒙太奇循环导致回调不触发时，
+    // 超时强制结束技能，避免 GA 永久卡在激活状态（→ 之后翻滚全部失效）。
+    const float MontageLen = MontageToPlay->GetPlayLength();
+    const float Timeout = FMath::Max(MontageLen + 0.5f, 1.5f);
+    GetWorld()->GetTimerManager().SetTimer(
+        DodgeTimeoutHandle, this, &UGA_PlayerDodge::ForceEndDodge, Timeout, false);
 }
 
 void UGA_PlayerDodge::OnMontageCompleted()
 {
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UGA_PlayerDodge::ForceEndDodge()
+{
+    UE_LOG(LogTemp, Warning, TEXT("[Dodge] Timeout - forcing EndAbility to prevent stuck"));
+    EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
 void UGA_PlayerDodge::EndAbility(const FGameplayAbilitySpecHandle Handle,
@@ -120,18 +144,29 @@ void UGA_PlayerDodge::EndAbility(const FGameplayAbilitySpecHandle Handle,
     bool bReplicateEndAbility,
     bool bWasCancelled)
 {
+    // 防重入：避免 EndAbility 与蒙太奇回调（EndTask→OnCancelled→OnMontageCompleted）互相调用
+    if (bIsEnding)
+        return;
+    bIsEnding = true;
+
+    // 取消超时定时器
+    if (DodgeTimeoutHandle.IsValid())
+    {
+        GetWorld()->GetTimerManager().ClearTimer(DodgeTimeoutHandle);
+    }
+
     if (ActiveMontageTask && ActiveMontageTask->IsActive())
     {
         ActiveMontageTask->EndTask();
     }
     ActiveMontageTask = nullptr;
 
-    // �Ƴ��޵б�ǩ
+    // 移除无敌标签
     if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
     {
         ASC->RemoveLooseGameplayTag(InvulnerableTag);
     }
 
-    // �� Super::EndAbility(...) �滻Ϊ UGameplayAbility::EndAbility(...) ��ȷ���ø���ʵ��
+    // 将 Super::EndAbility(...) 替换为 UGameplayAbility::EndAbility(...) 明确调用父类实现
     UGameplayAbility::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }

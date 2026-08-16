@@ -8,6 +8,7 @@
 #include "GameplayEffectTypes.h"
 #include "AbilitySystemInterface.h"
 #include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h" // å‘½ä¸­ä½ç½®è®¡ç®—ï¼šå–ç›®æ ‡èƒ¶å›ŠåŠå¾„
 
 UGA_PlayerCombo::UGA_PlayerCombo()
 {
@@ -16,6 +17,9 @@ UGA_PlayerCombo::UGA_PlayerCombo()
     FGameplayTagContainer NewTags;
     NewTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Combo")));
     SetAssetTags(NewTags);
+
+    // å‘½ä¸­ GameplayCue é»˜è®¤å€¼ï¼ˆå¯åœ¨è“å›¾ Class Defaults è¦†ç›–ï¼‰
+    HitCueTag = FGameplayTag::RequestGameplayTag(FName("GameplayCue.Player.Hit"));
 }
 
 void UGA_PlayerCombo::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -41,7 +45,7 @@ void UGA_PlayerCombo::PlayComboSection(int32 SectionIndex)
         return;
     }
 
-    // ÇåÀíÉÏÒ»¶ÎµÄËùÓÐ¶¨Ê±Æ÷ºÍÈÎÎñ
+    // æ¸…ç†ä¸Šä¸€æ®µçš„æ‰€æœ‰å®šæ—¶å™¨å’Œä»»åŠ¡
     if (GetWorld())
     {
         GetWorld()->GetTimerManager().ClearTimer(ComboWindowOpenTimer);
@@ -59,7 +63,7 @@ void UGA_PlayerCombo::PlayComboSection(int32 SectionIndex)
     bIsDamageWindowActive = false;
     DamagedTargets.Empty();
 
-    // È·¶¨ Section Ãû³Æ
+    // ç¡®å®š Section åç§°
     FName TargetSection;
     switch (SectionIndex)
     {
@@ -70,7 +74,7 @@ void UGA_PlayerCombo::PlayComboSection(int32 SectionIndex)
     default: TargetSection = Section1; break;
     }
 
-    // ²¥·ÅÃÉÌ«Ææ£¬²¢°ó¶¨Íê³É/ÖÐ¶Ï»Øµ÷
+    // æ’­æ”¾è’™å¤ªå¥‡ï¼Œå¹¶ç»‘å®šå®Œæˆ/ä¸­æ–­å›žè°ƒ
     UAbilityTask_PlayMontageAndWait* MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
         this, NAME_None, ComboMontage, 1.0f, TargetSection);
     MontageTask->OnCompleted.AddDynamic(this, &UGA_PlayerCombo::OnMontageCompleted);
@@ -81,14 +85,14 @@ void UGA_PlayerCombo::PlayComboSection(int32 SectionIndex)
 
     bMontagePlaying = true;
 
-    // »ñÈ¡µ±Ç° Section Ê±³¤
+    // èŽ·å–å½“å‰ Section æ—¶é•¿
     float SectionDuration = ComboMontage->GetSectionLength(ComboMontage->GetSectionIndex(TargetSection));
     if (SectionDuration <= 0.0f)
     {
         SectionDuration = ComboMontage->GetPlayLength();
     }
 
-    // ¿ªÆôÊäÈë´°¿Ú¶¨Ê±Æ÷£¨½áÊøÇ° PreInputWindow Ãë£©
+    // å¼€å¯è¾“å…¥çª—å£å®šæ—¶å™¨ï¼ˆç»“æŸå‰ PreInputWindow ç§’ï¼‰
     float OpenDelay = FMath::Max(0.0f, SectionDuration - PreInputWindow);
     GetWorld()->GetTimerManager().SetTimer(
         ComboWindowOpenTimer,
@@ -98,7 +102,7 @@ void UGA_PlayerCombo::PlayComboSection(int32 SectionIndex)
         false
     );
 
-    // ¹Ø±ÕÊäÈë´°¿Ú¶¨Ê±Æ÷£¨½áÊøºó PostInputWindow Ãë£©
+    // å…³é—­è¾“å…¥çª—å£å®šæ—¶å™¨ï¼ˆç»“æŸåŽ PostInputWindow ç§’ï¼‰
     float CloseDelay = SectionDuration + PostInputWindow;
     GetWorld()->GetTimerManager().SetTimer(
         ComboWindowCloseTimer,
@@ -108,7 +112,7 @@ void UGA_PlayerCombo::PlayComboSection(int32 SectionIndex)
         false
     );
 
-    // µÈ´ýÉËº¦¿ªÊ¼/½áÊøÊÂ¼þ
+    // ç­‰å¾…ä¼¤å®³å¼€å§‹/ç»“æŸäº‹ä»¶
     UAbilityTask_WaitGameplayEvent* WaitDamageStart = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this, FGameplayTag::RequestGameplayTag(FName("Event.Attack.Start")), nullptr, true, true);
     WaitDamageStart->EventReceived.AddDynamic(this, &UGA_PlayerCombo::OnAttackDamageStart);
@@ -124,7 +128,7 @@ void UGA_PlayerCombo::OnComboWindowOpen()
 {
     bComboWindowOpen = true;
 
-    // ¿ªÊ¼¼àÌýÁ¬ÕÐÊäÈë
+    // å¼€å§‹ç›‘å¬è¿žæ‹›è¾“å…¥
     ComboWaitTask = UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(
         this,
         FGameplayTag::RequestGameplayTag(FName("Event.Player.ComboInput")),
@@ -138,7 +142,7 @@ void UGA_PlayerCombo::OnComboWindowOpen()
 
 void UGA_PlayerCombo::OnComboWindowClose()
 {
-    // Ö»ÓÐµ±Ã»ÓÐ´ý´¦ÀíµÄÏÂÒ»¶ÎÇÒÃÉÌ«ÆæÒÑÍ£Ö¹Ê±²Å½áÊøÁ¬ÕÐ
+    // åªæœ‰å½“æ²¡æœ‰å¾…å¤„ç†çš„ä¸‹ä¸€æ®µä¸”è’™å¤ªå¥‡å·²åœæ­¢æ—¶æ‰ç»“æŸè¿žæ‹›
     if (!bPendingNextCombo && !bMontagePlaying)
     {
         EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
@@ -149,7 +153,7 @@ void UGA_PlayerCombo::OnComboInputReceived(FGameplayEventData Payload)
 {
     if (!bComboWindowOpen) return;
 
-    // ÇåÀí¶¨Ê±Æ÷ºÍ¼àÌýÈÎÎñ
+    // æ¸…ç†å®šæ—¶å™¨å’Œç›‘å¬ä»»åŠ¡
     GetWorld()->GetTimerManager().ClearTimer(ComboWindowOpenTimer);
     GetWorld()->GetTimerManager().ClearTimer(ComboWindowCloseTimer);
     bComboWindowOpen = false;
@@ -162,12 +166,12 @@ void UGA_PlayerCombo::OnComboInputReceived(FGameplayEventData Payload)
 
     if (bMontagePlaying)
     {
-        // µ±Ç°¶Î»¹ÔÚ²¥·Å£¬ÉèÖÃ pending£¬µÈÃÉÌ«ÆæÍê³ÉºóÔÙ½øÈëÏÂÒ»¶Î
+        // å½“å‰æ®µè¿˜åœ¨æ’­æ”¾ï¼Œè®¾ç½® pendingï¼Œç­‰è’™å¤ªå¥‡å®ŒæˆåŽå†è¿›å…¥ä¸‹ä¸€æ®µ
         bPendingNextCombo = true;
     }
     else
     {
-        // µ±Ç°¶ÎÒÑ¾­½áÊø£¬´¦ÓÚºóÒ¡´°¿Ú£¬Á¢¼´½øÈëÏÂÒ»¶Î
+        // å½“å‰æ®µå·²ç»ç»“æŸï¼Œå¤„äºŽåŽæ‘‡çª—å£ï¼Œç«‹å³è¿›å…¥ä¸‹ä¸€æ®µ
         CurrentComboIndex = (CurrentComboIndex + 1) % 4;
         PlayComboSection(CurrentComboIndex);
     }
@@ -183,12 +187,12 @@ void UGA_PlayerCombo::OnMontageCompleted()
         CurrentComboIndex = (CurrentComboIndex + 1) % 4;
         PlayComboSection(CurrentComboIndex);
     }
-    // ·ñÔò²»×öÈÎºÎÊÂ£¬µÈ´ý CloseTimer ´¥·¢½áÊøÁ¬ÕÐ
+    // å¦åˆ™ä¸åšä»»ä½•äº‹ï¼Œç­‰å¾… CloseTimer è§¦å‘ç»“æŸè¿žæ‹›
 }
 
 void UGA_PlayerCombo::OnMontageInterrupted()
 {
-    // ±»Íâ²¿´ò¶Ï£¬Ö±½Ó½áÊø
+    // è¢«å¤–éƒ¨æ‰“æ–­ï¼Œç›´æŽ¥ç»“æŸ
     EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
@@ -256,6 +260,36 @@ void UGA_PlayerCombo::PerformDamageTrace()
                         EffectContext
                     );
                     DamagedTargets.Add(Victim);
+
+                    // ===== å‘½ä¸­ä½ç½®è®¡ç®— =====
+                    // æ³¨æ„ï¼šè¿™é‡Œæ˜¯çƒå½¢ Overlap æ£€æµ‹ï¼Œæ²¡æœ‰ç‰©ç†æ„ä¹‰ä¸Šçš„å‘½ä¸­ç‚¹ï¼ˆæ—  HitResultï¼‰ã€‚
+                    // ç”¨"ç›®æ ‡èƒ¶å›Šè¡¨é¢æœå‘æ”»å‡»è€…çš„ç‚¹"è¿‘ä¼¼æŽ¥è§¦ä½ç½®ï¼ˆç åœ¨ç›®æ ‡èº«ä¸Šçš„ä½ç½®ï¼‰ï¼š
+                    const FVector ToVictim = Victim->GetActorLocation() - Avatar->GetActorLocation();
+                    const FVector AttackDir = ToVictim.GetSafeNormal2D();
+
+                    float VictimRadius = 0.0f;
+                    if (const ACharacter* VictimChar = Cast<ACharacter>(Victim))
+                    {
+                        VictimRadius = VictimChar->GetCapsuleComponent()->GetScaledCapsuleRadius();
+                    }
+                    // æŽ¥è§¦ç‚¹ï¼šç›®æ ‡ä¸­å¿ƒå‘æ”»å‡»è€…æ–¹å‘å›žé€€ä¸€ä¸ªåŠå¾„ï¼ˆæŽ¥è¿‘èƒ¶å›Šè¡¨é¢ï¼‰ï¼Œå¸¦æœ€å°åç§»é˜²æ­¢ä¸Žä¸­å¿ƒé‡åˆ
+                    const FVector HitPoint = Victim->GetActorLocation() - AttackDir * FMath::Max(VictimRadius * 0.8f, 30.0f);
+                    const FVector HitNormal = -AttackDir; // å‘½ä¸­æ³•çº¿æŒ‡å‘æ”»å‡»è€…
+
+                    // ===== å‘½ä¸­ GameplayCueï¼ˆç‰¹æ•ˆ + éŸ³æ•ˆï¼‰=====
+                    // ç‰¹æ•ˆï¼ˆNiagaraï¼‰ä¸ŽéŸ³æ•ˆèµ„äº§éƒ½åœ¨ GameplayCueNotify è“å›¾é‡Œé…ç½®ï¼Œä»£ç åªå‘äº‹ä»¶ã€‚
+                    if (HitCueTag.IsValid() && TargetASC)
+                    {
+                        FGameplayCueParameters CueParams;
+                        CueParams.Location = HitPoint;
+                        CueParams.Normal = HitNormal;
+                        CueParams.Instigator = Avatar;
+                        CueParams.EffectCauser = Avatar;
+                        TargetASC->ExecuteGameplayCue(HitCueTag, CueParams);
+
+                        UE_LOG(LogTemp, Log, TEXT("[Combo] HitCue %s executed at %s (target %s)"),
+                            *HitCueTag.ToString(), *HitPoint.ToString(), *GetNameSafe(Victim));
+                    }
                 }
             }
         }

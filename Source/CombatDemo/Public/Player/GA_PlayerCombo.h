@@ -18,11 +18,11 @@ public:
     UPROPERTY(EditDefaultsOnly, Category = "Combo")
     UAnimMontage* ComboMontage;
 
-    // ��һ�ν���ǰ��ÿ�ʼ��������
+    // 上一段结束前多久开始接受输入
     UPROPERTY(EditDefaultsOnly, Category = "Combo")
     float PreInputWindow = 0.5f;
 
-    // ��һ�ν��������ڽ�������
+    // 上一段结束后多久内接受输入
     UPROPERTY(EditDefaultsOnly, Category = "Combo")
     float PostInputWindow = 0.3f;
 
@@ -43,6 +43,12 @@ public:
 
     UPROPERTY(EditDefaultsOnly, Category = "Damage")
     TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+    // ===== 命中特效/音效（GameplayCue）=====
+    // 攻击命中目标时，在目标身上执行该 GameplayCue。
+    // 特效（Niagara）与打击音效由 GameplayCueNotify_Static 蓝图配置，代码不直接引用资产。
+    UPROPERTY(EditDefaultsOnly, Category = "HitFX")
+    FGameplayTag HitCueTag;
 
     UPROPERTY()
     TArray<AActor*> DamagedTargets;
@@ -80,13 +86,13 @@ private:
     UFUNCTION()
     void OnComboInputReceived(FGameplayEventData Payload);
 
-    // ��̫�����/�жϻص�
+    // 蒙太奇完成/中断回调
     UFUNCTION()
     void OnMontageCompleted();
     UFUNCTION()
     void OnMontageInterrupted();
 
-    // �˺��ж�
+    // 伤害判定
     UFUNCTION()
     void OnAttackDamageStart(FGameplayEventData Payload);
     UFUNCTION()

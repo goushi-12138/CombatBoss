@@ -30,7 +30,17 @@ public:
     // 翻滚无敌标签，翻滚期间添加
     FGameplayTag InvulnerableTag;
 
+    // 每次翻滚消耗的精力（默认20，精力不足时无法翻滚）
+    UPROPERTY(EditDefaultsOnly, Category = "Dodge")
+    float StaminaCost = 20.0f;
+
 protected:
+    virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+        const FGameplayAbilityActorInfo* ActorInfo,
+        const FGameplayTagContainer* SourceTags,
+        const FGameplayTagContainer* TargetTags,
+        FGameplayTagContainer* OptionalRelevantTags) const override;
+
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
         const FGameplayAbilityActorInfo* ActorInfo,
         const FGameplayAbilityActivationInfo ActivationInfo,

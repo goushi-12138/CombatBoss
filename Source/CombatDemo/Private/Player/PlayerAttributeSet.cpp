@@ -6,6 +6,10 @@ UPlayerAttributeSet::UPlayerAttributeSet()
 {
     InitMaxHealth(100.0f);
     InitHealth(100.0f);
+
+    // 精力：最大 100，初始 100
+    InitMaxStamina(100.0f);
+    InitStamina(100.0f);
 }
 
 void UPlayerAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)

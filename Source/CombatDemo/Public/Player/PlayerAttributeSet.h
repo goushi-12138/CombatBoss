@@ -27,5 +27,14 @@ public:
     FGameplayAttributeData MaxHealth;
     ATTRIBUTE_ACCESSORS(UPlayerAttributeSet, MaxHealth);
 
+    // ===== 精力（翻滚消耗，每秒恢复）=====
+    UPROPERTY(BlueprintReadOnly, Category = "Attributes")
+    FGameplayAttributeData Stamina;
+    ATTRIBUTE_ACCESSORS(UPlayerAttributeSet, Stamina);
+
+    UPROPERTY(BlueprintReadOnly, Category = "Attributes")
+    FGameplayAttributeData MaxStamina;
+    ATTRIBUTE_ACCESSORS(UPlayerAttributeSet, MaxStamina);
+
     virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 };

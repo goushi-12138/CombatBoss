@@ -1,5 +1,6 @@
 #include "Player/GA_PlayerDodge.h"
 #include "CombatDemoCharacter.h"
+#include "Player/PlayerAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "GameFramework/Character.h"
@@ -28,6 +29,31 @@ UGA_PlayerDodge::UGA_PlayerDodge()
     InvulnerableTag = FGameplayTag::RequestGameplayTag(FName("Status.Dodging"));
 }
 
+bool UGA_PlayerDodge::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+    const FGameplayAbilityActorInfo* ActorInfo,
+    const FGameplayTagContainer* SourceTags,
+    const FGameplayTagContainer* TargetTags,
+    FGameplayTagContainer* OptionalRelevantTags) const
+{
+    if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+    {
+        return false;
+    }
+
+    // 精力不足时无法翻滚
+    if (const UAbilitySystemComponent* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr)
+    {
+        const float Stamina = ASC->GetNumericAttribute(UPlayerAttributeSet::GetStaminaAttribute());
+        if (Stamina < StaminaCost)
+        {
+            UE_LOG(LogTemp, Log, TEXT("[Dodge] Not enough stamina: %.1f < %.1f"), Stamina, StaminaCost);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void UGA_PlayerDodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     const FGameplayAbilityActorInfo* ActorInfo,
     const FGameplayAbilityActivationInfo ActivationInfo,
@@ -53,6 +79,10 @@ void UGA_PlayerDodge::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
     if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
     {
         ASC->AddLooseGameplayTag(InvulnerableTag);
+
+        // 扣除翻滚精力（每次翻滚消耗 StaminaCost）
+        const float Stamina = ASC->GetNumericAttribute(UPlayerAttributeSet::GetStaminaAttribute());
+        ASC->SetNumericAttributeBase(UPlayerAttributeSet::GetStaminaAttribute(), FMath::Max(0.0f, Stamina - StaminaCost));
     }
 
     // 读取角色上存储的翻滚方向（由 CombatDemoCharacter 设置）

@@ -12,6 +12,8 @@ class UInputAction;
 class UAbilitySystemComponent;
 class UPlayerAttributeSet;
 class UGameplayAbility;
+class UPlayerStatusWidget;
+class UBossHealthBarWidget;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -29,21 +31,21 @@ class ACombatDemoCharacter : public ACharacter, public IAbilitySystemInterface
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
     UCameraComponent* FollowCamera;
 
-    // ========== GAS ×é¼ş ==========
+    // ========== GAS ç»„ä»¶ ==========
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "GAS", meta = (AllowPrivateAccess = "true"))
     UAbilitySystemComponent* AbilitySystemComponent;
 
     UPROPERTY()
     UPlayerAttributeSet* PlayerAttributeSet;
-    // ========== GAS ×é¼ş½áÊø ==========
+    // ========== GAS ç»„ä»¶ç»“æŸ ==========
 
-    // ÔÚ ACombatDemoCharacter µÄ public »ò protected ÇøÓòÌí¼Ó
+    // åœ¨ ACombatDemoCharacter çš„ public æˆ– protected åŒºåŸŸæ·»åŠ 
 public:
-    /** ÓÒÊÖ¸«Í·×é¼ş */
+    /** å³æ‰‹æ–§å¤´ç»„ä»¶ */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
     UStaticMeshComponent* AxeMesh;
 
-    /** ×óÊÖ¶ÜÅÆ×é¼ş */
+    /** å·¦æ‰‹ç›¾ç‰Œç»„ä»¶ */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
     UStaticMeshComponent* ShieldMesh;
 protected:
@@ -64,7 +66,7 @@ protected:
     UPROPERTY(EditAnywhere, Category = "Input")
     UInputAction* MouseLookAction;
 
-    /** Attack Input Action ¡ª ĞÂÔö */
+    /** Attack Input Action â€” æ–°å¢ */
     UPROPERTY(EditAnywhere, Category = "Input")
     UInputAction* AttackAction;
 
@@ -76,23 +78,52 @@ protected:
     void OnBlockPressed();
     void OnBlockReleased();
 
-    /** ³õÊ¼¼¼ÄÜ */
+    /** åˆå§‹æŠ€èƒ½ */
     UPROPERTY(EditDefaultsOnly, Category = "GAS|Abilities")
     TArray<TSubclassOf<UGameplayAbility>> InitialAbilities;
 
+    // ========== UI ==========
+    /** ç©å®¶çŠ¶æ€HUDï¼ˆè¡€æ¡+ç²¾åŠ›æ¡ï¼‰Widget è“å›¾ç±»ï¼Œåœ¨ BP_ThirdPersonCharacter ä¸­æŒ‡å®š WBP_PlayerStatus */
+    UPROPERTY(EditDefaultsOnly, Category = "UI")
+    TSubclassOf<UPlayerStatusWidget> PlayerStatusWidgetClass;
+
+    /** Boss è¡€æ¡ Widget è“å›¾ç±»ï¼Œåœ¨ BP_ThirdPersonCharacter ä¸­æŒ‡å®š WBP_BossHealthBar */
+    UPROPERTY(EditDefaultsOnly, Category = "UI")
+    TSubclassOf<UBossHealthBarWidget> BossHealthBarWidgetClass;
+    // ========== UI ç»“æŸ ==========
+
+    // ========== ç²¾åŠ›æ¢å¤ ==========
+    /** ç²¾åŠ›æ¯ç§’æ¢å¤é‡ï¼ˆé»˜è®¤5ï¼‰ */
+    UPROPERTY(EditAnywhere, Category = "GAS|Stamina")
+    float StaminaRegenPerSecond = 5.0f;
+
+    /** ç²¾åŠ›æ¢å¤è®¡æ—¶ç´¯ç§¯å™¨ï¼ˆæ¯ç§’è§¦å‘ä¸€æ¬¡æ¢å¤ï¼‰ */
+    float StaminaRegenAccumulator = 0.0f;
+    // ========== ç²¾åŠ›æ¢å¤ç»“æŸ ==========
+
 private:
-    // »÷µ¹×´Ì¬¸ú×Ù£ºÊÇ·ñÉÏÒ»Ö¡´¦ÓÚ»÷µ¹×´Ì¬
+    // å‡»å€’çŠ¶æ€è·Ÿè¸ªï¼šæ˜¯å¦ä¸Šä¸€å¸§å¤„äºå‡»å€’çŠ¶æ€
     bool bWasStunned = false;
 
-    // ´¦Àí»÷µ¹×´Ì¬±ä»¯
+    // å¤„ç†å‡»å€’çŠ¶æ€å˜åŒ–
     void UpdateStunnedState(float DeltaTime);
+
+    // ç²¾åŠ›æ¯ç§’æ¢å¤
+    void RegenStamina(float DeltaTime);
+
+    // ä¿å­˜ Widget å®ä¾‹ï¼ˆé˜²æ­¢è¢« GCï¼‰
+    UPROPERTY()
+    UPlayerStatusWidget* PlayerStatusWidget;
+
+    UPROPERTY()
+    UBossHealthBarWidget* BossHealthBarWidget;
 
 public:
 
     /** Constructor */
     ACombatDemoCharacter();
 
-    // GAS ½Ó¿Ú
+    // GAS æ¥å£
     virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 protected:
@@ -109,7 +140,7 @@ protected:
     /** Called for looking input */
     void Look(const FInputActionValue& Value);
 
-    /** Called for attack input ¡ª ĞÂÔö */
+    /** Called for attack input â€” æ–°å¢ */
     void OnAttackPressed();
 
 public:
@@ -129,7 +160,7 @@ public:
     /** Handles jump pressed inputs from either controls or UI interfaces */
     UFUNCTION(BlueprintCallable, Category = "Input")
     virtual void DoJumpEnd();
-    // ·­¹ö·½Ïò£¨ÓÉÊäÈëÉèÖÃ£¬GA¶ÁÈ¡£©
+    // ç¿»æ»šæ–¹å‘ï¼ˆç”±è¾“å…¥è®¾ç½®ï¼ŒGAè¯»å–ï¼‰
 public:
     FVector DodgeDirection;
 

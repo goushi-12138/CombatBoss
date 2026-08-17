@@ -11,6 +11,9 @@
 #include "AbilitySystemComponent.h"
 #include "Player/PlayerAttributeSet.h"
 #include "CombatDemo.h"
+#include "Blueprint/UserWidget.h"
+#include "UI/PlayerStatusWidget.h"
+#include "UI/BossHealthBarWidget.h"
 
 ACombatDemoCharacter::ACombatDemoCharacter()
 {
@@ -79,6 +82,27 @@ void ACombatDemoCharacter::BeginPlay()
             AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(AbilityClass, 1, INDEX_NONE, this));
         }
     }
+
+    // ===== 创建 UI =====
+    // 玩家状态 HUD（血条+精力条，屏幕左下方）
+    if (PlayerStatusWidgetClass)
+    {
+        PlayerStatusWidget = CreateWidget<UPlayerStatusWidget>(GetWorld(), PlayerStatusWidgetClass);
+        if (PlayerStatusWidget)
+        {
+            PlayerStatusWidget->AddToViewport();
+        }
+    }
+    // Boss 血条（屏幕上方中央，靠近Boss渐显/远离渐隐）
+    if (BossHealthBarWidgetClass)
+    {
+        BossHealthBarWidget = CreateWidget<UBossHealthBarWidget>(GetWorld(), BossHealthBarWidgetClass);
+        if (BossHealthBarWidget)
+        {
+            BossHealthBarWidget->AddToViewport();
+        }
+    }
+    // ===== 创建 UI 结束 =====
 }
 
 void ACombatDemoCharacter::Tick(float DeltaSeconds)
@@ -86,6 +110,28 @@ void ACombatDemoCharacter::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
 
     UpdateStunnedState(DeltaSeconds);
+    RegenStamina(DeltaSeconds);
+}
+
+void ACombatDemoCharacter::RegenStamina(float DeltaTime)
+{
+    if (!AbilitySystemComponent) return;
+
+    // 每秒恢复 StaminaRegenPerSecond 点精力（上限 MaxStamina）
+    StaminaRegenAccumulator += DeltaTime;
+    while (StaminaRegenAccumulator >= 1.0f)
+    {
+        StaminaRegenAccumulator -= 1.0f;
+
+        const float Stamina = AbilitySystemComponent->GetNumericAttribute(UPlayerAttributeSet::GetStaminaAttribute());
+        const float MaxStamina = AbilitySystemComponent->GetNumericAttribute(UPlayerAttributeSet::GetMaxStaminaAttribute());
+        if (Stamina < MaxStamina)
+        {
+            AbilitySystemComponent->SetNumericAttributeBase(
+                UPlayerAttributeSet::GetStaminaAttribute(),
+                FMath::Min(MaxStamina, Stamina + StaminaRegenPerSecond));
+        }
+    }
 }
 
 void ACombatDemoCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

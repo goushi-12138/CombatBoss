@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "GameplayEffectTypes.h"
+#include "GameplayEffect.h" // FGameplayModifierInfo / FScalableFloat（格挡减伤克隆GE用）
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
 #include "TimerManager.h"
@@ -13,6 +14,7 @@
 #include "Engine/EngineTypes.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "GameFramework/Character.h" // LaunchCharacter 推开被格挡的玩家
 #include "AbilitySystemBlueprintLibrary.h" // 添加头文件
 
 UBossGameplayAbility::UBossGameplayAbility()
@@ -135,6 +137,20 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 			if (!Victim || Victim == Avatar) continue;
 			if (DamagedTargets.Contains(Victim)) continue;
 
+			// ===== 攻击锥限制：AttackConeAngle < 360 时，只命中 Boss 前方该角度范围内的目标 =====
+			// （左挥砍/右挥砍/二连砍/举砸 配 150 = 前方 ±75°；旋转连砍/跳劈保持 360 全向）
+			if (AttackConeAngle > 0.0f && AttackConeAngle < 359.9f)
+			{
+				const FVector ToVictim = (Victim->GetActorLocation() - Avatar->GetActorLocation()).GetSafeNormal2D();
+				const FVector BossForward = Avatar->GetActorForwardVector().GetSafeNormal2D();
+				const float Angle = FMath::RadiansToDegrees(
+					FMath::Acos(FMath::Clamp(FVector::DotProduct(BossForward, ToVictim), -1.0f, 1.0f)));
+				if (Angle > AttackConeAngle * 0.5f)
+				{
+					continue; // 目标在攻击锥外（Boss 身后），不造成伤害
+				}
+			}
+
 			IAbilitySystemInterface* ASCInterface = Cast<IAbilitySystemInterface>(Victim);
 			if (ASCInterface)
 			{
@@ -147,24 +163,44 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 
 					if (DamageEffectClass)
 					{
+						// ===== 盾牌格挡判定：玩家防御中 且 攻击来自玩家前方防御锥内 =====
+						// 格挡成功：减伤70%（玩家侧属性集根据 Status.Blocking + 方向判定完成）
+						//           + 不播受击 + 盾牌格挡音效 + 向后推开
+						// 格挡无效（无防御/攻击来自背后）：全额伤害 + 正常播放受击动画
+						// 注意：伤害GE这里按原样应用，减伤由玩家侧 PlayerAttributeSet 结算，
+						// 不在此修改GE（避免依赖 UE5.7 中频繁变动的 GE 结构 API）。
+						const bool bShieldBlocked = IsAttackBlockedByShield(Victim);
+
 						FGameplayEffectContextHandle EffectContext = GetAbilitySystemComponentFromActorInfo()->MakeEffectContext();
 						GetAbilitySystemComponentFromActorInfo()->ApplyGameplayEffectToTarget(
 							DamageEffectClass.GetDefaultObject(), TargetASC, 1.0f, EffectContext);
 						DamagedTargets.Add(Victim);
 
-						// ===== 新增：命中玩家后发送受击事件（播放受击蒙太奇）=====
-						SendHitReactEvent(Victim);
-
-						// 【盾牌格挡音效】玩家防御中（Status.Blocking）：
-						// SendHitReactEvent 内部会跳过受击动画，这里改发盾牌被击事件，
-						// 由玩家 GA_PlayerBlock 监听并在盾牌组件位置播放格挡音效。
-						if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking"))))
+						if (bShieldBlocked)
 						{
+							// 格挡冲击：把玩家沿"背向Boss"方向推开（水平滑步一小段，表现冲击力）。
+							// LaunchCharacter 给一个初速度，靠地面摩擦自然滑行停下。
+							if (BlockPushSpeed > 0.0f)
+							{
+								if (ACharacter* PlayerChar = Cast<ACharacter>(Victim))
+								{
+									const FVector PushDir =
+										(Victim->GetActorLocation() - Avatar->GetActorLocation()).GetSafeNormal2D();
+									PlayerChar->LaunchCharacter(PushDir * BlockPushSpeed, false, false);
+								}
+							}
+
+							// 格挡成功：不播受击动画，发送盾牌被击事件（玩家侧播放格挡音效）
 							FGameplayEventData BlockEvent;
 							BlockEvent.Instigator = Avatar;
 							BlockEvent.Target = Victim;
 							TargetASC->HandleGameplayEvent(
 								FGameplayTag::RequestGameplayTag(FName("Event.Player.BlockHit")), &BlockEvent);
+						}
+						else
+						{
+							// 无防御 或 攻击来自背后（格挡无效）：正常播放受击动画
+							SendHitReactEvent(Victim);
 						}
 
 						// 连续伤害（旋转挥砍）：命中后立即从已伤害列表移除，
@@ -181,6 +217,37 @@ void UBossGameplayAbility::ApplyDamageToTarget()
 	}
 }
 
+bool UBossGameplayAbility::IsAttackBlockedByShield(AActor* Victim) const
+{
+	if (!Victim) return false;
+
+	IAbilitySystemInterface* ASCI = Cast<IAbilitySystemInterface>(Victim);
+	UAbilitySystemComponent* TargetASC = ASCI ? ASCI->GetAbilitySystemComponent() : nullptr;
+	if (!TargetASC) return false;
+
+	// 玩家没举盾 → 无格挡
+	if (!TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking"))))
+		return false;
+
+	// 防御锥 360（全向）→ 任意方向都算格挡
+	if (ShieldDefenseConeAngle >= 359.9f)
+		return true;
+
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!Avatar) return false;
+
+	// 格挡成功的语义：Boss 位于玩家"前方"（玩家面朝 Boss）。
+	// 因此用"玩家 → Boss"方向 与 玩家 forward 的夹角判断：
+	// 玩家正对 Boss → 两方向同向（Dot>0、夹角小）→ 格挡成功；
+	// 玩家背对 Boss → 夹角大 → 格挡失败（来自身后的攻击防御无效）。
+	const FVector ToBoss = (Avatar->GetActorLocation() - Victim->GetActorLocation()).GetSafeNormal2D();
+	const FVector PlayerForward = Victim->GetActorForwardVector().GetSafeNormal2D();
+	const float Angle = FMath::RadiansToDegrees(
+		FMath::Acos(FMath::Clamp(FVector::DotProduct(ToBoss, PlayerForward), -1.0f, 1.0f)));
+
+	return Angle <= ShieldDefenseConeAngle * 0.5f;
+}
+
 void UBossGameplayAbility::SendHitReactEvent(AActor* Victim)
 {
 	if (!Victim) return;
@@ -193,9 +260,10 @@ void UBossGameplayAbility::SendHitReactEvent(AActor* Victim)
 		return;
 	}
 
-	// 防御中/无敌中不播放受击（伤害照常施加，防御减伤逻辑可后续自行扩展）
-	if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Blocking"))))
-		return;
+	// 无敌中不播放受击（伤害照常施加）。
+	// 注意：防御（Status.Blocking）不再在这里跳过——格挡是否有效由调用方
+	// ApplyDamageToTarget 通过 IsAttackBlockedByShield 判定：正面格挡 → 不调用本函数（改发盾牌音效）；
+	// 背后攻击/无防御 → 调用本函数播放受击动画。
 	if (TargetASC->HasMatchingGameplayTag(FGameplayTag::RequestGameplayTag(FName("Status.Dodging"))))
 		return;
 

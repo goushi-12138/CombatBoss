@@ -13,7 +13,10 @@
 UGA_PlayerBlock::UGA_PlayerBlock()
 {
     InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
-    AbilityTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
+
+    FGameplayTagContainer BlockingTag;
+    BlockingTag.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Block")));
+    SetAssetTags(BlockingTag);
 
     ActivationBlockedTags.AddTag(FGameplayTag::RequestGameplayTag(FName("Ability.Player.Dodge")));
 

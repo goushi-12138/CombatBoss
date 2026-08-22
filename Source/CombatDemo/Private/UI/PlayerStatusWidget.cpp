@@ -1,4 +1,5 @@
 #include "UI/PlayerStatusWidget.h"
+#include "UI/DelayedBarHelper.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "Player/PlayerAttributeSet.h"
@@ -16,12 +17,24 @@ void UPlayerStatusWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaT
 	UAbilitySystemComponent* ASC = ASCI ? ASCI->GetAbilitySystemComponent() : nullptr;
 	if (!ASC) return;
 
-	// 血条
+	// 血条（红条立即更新）+ 延迟白条（受伤后延迟追赶到红条）
 	const float Health = ASC->GetNumericAttribute(UPlayerAttributeSet::GetHealthAttribute());
 	const float MaxHealth = ASC->GetNumericAttribute(UPlayerAttributeSet::GetMaxHealthAttribute());
-	if (HealthBar && MaxHealth > 0.0f)
+	if (MaxHealth > 0.0f)
 	{
-		HealthBar->SetPercent(FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f));
+		const float RedPercent = FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f);
+		if (HealthBar)
+		{
+			HealthBar->SetPercent(RedPercent);
+		}
+
+		if (DelayBar)
+		{
+			const float WhitePercent = DelayedBarHelper::Tick(
+				WhiteBarPercent, LastRedPercent, DelayRemaining,
+				RedPercent, InDeltaTime, WhiteBarDelay, WhiteBarInterpSpeed);
+			DelayBar->SetPercent(WhitePercent);
+		}
 	}
 
 	// 精力条

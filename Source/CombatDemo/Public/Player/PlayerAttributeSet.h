@@ -37,4 +37,8 @@ public:
     ATTRIBUTE_ACCESSORS(UPlayerAttributeSet, MaxStamina);
 
     virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+
+protected:
+    /** 判断攻击是否来自玩家前方（用于盾牌格挡减伤：Boss 位于玩家前方 ±75° 内才算格挡） */
+    bool IsAttackFromFront() const;
 };

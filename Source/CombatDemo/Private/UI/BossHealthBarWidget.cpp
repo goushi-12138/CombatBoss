@@ -1,4 +1,5 @@
 #include "UI/BossHealthBarWidget.h"
+#include "UI/DelayedBarHelper.h"
 #include "Boss/Boss_Berserker.h"
 #include "Boss/BossAttributeSet.h"
 #include "AbilitySystemComponent.h"
@@ -22,14 +23,26 @@ void UBossHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDelta
 	ABoss_Berserker* Boss = CachedBoss.Get();
 	if (!Boss) return;
 
-	// 更新血量
+	// 更新血量（红条立即更新）+ 延迟白条（受伤后延迟追赶到红条）
 	if (UAbilitySystemComponent* BossASC = Boss->GetAbilitySystemComponent())
 	{
 		const float Health = BossASC->GetNumericAttribute(UBossAttributeSet::GetHealthAttribute());
 		const float MaxHealth = BossASC->GetNumericAttribute(UBossAttributeSet::GetMaxHealthAttribute());
-		if (BossHealthBar && MaxHealth > 0.0f)
+		if (MaxHealth > 0.0f)
 		{
-			BossHealthBar->SetPercent(FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f));
+			const float RedPercent = FMath::Clamp(Health / MaxHealth, 0.0f, 1.0f);
+			if (BossHealthBar)
+			{
+				BossHealthBar->SetPercent(RedPercent);
+			}
+
+			if (DelayBar)
+			{
+				const float WhitePercent = DelayedBarHelper::Tick(
+					WhiteBarPercent, LastRedPercent, DelayRemaining,
+					RedPercent, InDeltaTime, WhiteBarDelay, WhiteBarInterpSpeed);
+				DelayBar->SetPercent(WhitePercent);
+			}
 		}
 	}
 

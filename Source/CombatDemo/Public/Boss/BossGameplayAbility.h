@@ -8,7 +8,7 @@
 class UGameplayEffect;
 class UAnimMontage;
 
-// ÊÜ»÷·½Ïò£¨¾ö¶¨Íæ¼Ò²¥·ÅÄÄ¸ö·½ÏòµÄÊÜ»÷ÃÉÌ«Ææ£©
+// å—å‡»æ–¹å‘ï¼ˆå†³å®šç©å®¶æ’­æ”¾å“ªä¸ªæ–¹å‘çš„å—å‡»è’™å¤ªå¥‡ï¼‰
 UENUM(BlueprintType)
 enum class EBossHitReactDirection : uint8
 {
@@ -27,68 +27,88 @@ class COMBATDEMO_API UBossGameplayAbility : public UGameplayAbility
 public:
 	UBossGameplayAbility();
 
-	// ¼¼ÄÜ ID£¨¶ÔÓ¦ºÚ°åÖĞµÄ AbilityID£©
+	// æŠ€èƒ½ IDï¼ˆå¯¹åº”é»‘æ¿ä¸­çš„ AbilityIDï¼‰
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA")
 	FName SkillID;
 
-	// ¾àÀëÌõ¼ş
+	// è·ç¦»æ¡ä»¶
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Conditions")
 	float MinDistance = 0.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Conditions")
 	float MaxDistance = 0.0f;
 
-	// ÀäÈ´ GameplayEffect£¨¿ÉÑ¡£©
+	// å†·å´ GameplayEffectï¼ˆå¯é€‰ï¼‰
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Cooldown")
 	TSubclassOf<UGameplayEffect> CooldownEffectClass;
 
-	// Òª²¥·ÅµÄÃÉÌ«Ææ
+	// è¦æ’­æ”¾çš„è’™å¤ªå¥‡
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Animation")
 	UAnimMontage* MontageToPlay;
 
-	// ÉËº¦ GameplayEffect
+	// ä¼¤å®³ GameplayEffect
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Damage")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
-	// ========== ÊÜ»÷·´À¡ ==========
-	// ÃüÖĞÍæ¼Òºó²¥·ÅÄÄ¸ö·½ÏòµÄÊÜ»÷ÃÉÌ«Ææ
-	// FromBoss = ¸ù¾İBossµ½Íæ¼ÒµÄÊµ¼Ê·½Ïò¶¯Ì¬¼ÆËã£¨ÍÆ¼ö£¬Ç°ÎåÖÖ¹¥»÷¾ù¿ÉÊ¹ÓÃ£©
+	// æ”»å‡»é”¥è§’åº¦ï¼ˆåº¦ï¼‰ï¼šåªèƒ½å‘½ä¸­ Boss å‰æ–¹è¯¥è§’åº¦èŒƒå›´å†…çš„ç›®æ ‡ã€‚
+	// ä¾‹å¦‚ 150 = å‰æ–¹ Â±75Â°ï¼›360ï¼ˆé»˜è®¤ï¼‰æˆ– 0 = ä¸é™åˆ¶ï¼ˆå…¨å‘ï¼‰ã€‚
+	// å·¦æŒ¥ç /å³æŒ¥ç /äºŒè¿ç /ä¸¾ç ¸ è“å›¾é…ç½®ä¸º 150ï¼›æ—‹è½¬è¿ç /è·³åŠˆä¿æŒ 360ã€‚
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Conditions")
+	float AttackConeAngle = 360.0f;
+
+	// ç©å®¶ç›¾ç‰Œé˜²å¾¡é”¥è§’åº¦ï¼ˆåº¦ï¼‰ï¼šç©å®¶ä¸¾ç›¾æ—¶ï¼Œåªæœ‰æ”»å‡»æ¥è‡ªç©å®¶å‰æ–¹è¯¥è§’åº¦èŒƒå›´å†…æ‰ç®—æ ¼æŒ¡æˆåŠŸ
+	// ï¼ˆæ ¼æŒ¡æˆåŠŸï¼šä¼¤å®³å‡70% + ä¸æ’­å—å‡»åŠ¨ç”» + æ’­æ”¾ç›¾ç‰Œæ ¼æŒ¡éŸ³æ•ˆï¼‰ã€‚
+	// æ¥è‡ªèº«åçš„æ”»å‡»æ ¼æŒ¡æ— æ•ˆï¼ˆå…¨é¢ä¼¤å®³ + æ­£å¸¸å—å‡»åŠ¨ç”»ï¼‰ã€‚é»˜è®¤ 150 = å‰æ–¹ Â±75Â°ã€‚
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Conditions")
+	float ShieldDefenseConeAngle = 150.0f;
+
+	// æ ¼æŒ¡å†²å‡»åˆé€Ÿåº¦ï¼ˆcm/sï¼‰ï¼šæ ¼æŒ¡æˆåŠŸæ—¶æŠŠç©å®¶å‘åæ¨å¼€çš„æ°´å¹³åˆé€Ÿåº¦ã€‚
+	// ç©å®¶ BrakingDecelerationWalking=2000 æ—¶ï¼Œæ»‘è¡Œè·ç¦» â‰ˆ vÂ²/(2*2000)ï¼Œ300 â‰ˆ 22 å•ä½ã€‚
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Conditions")
+	float BlockPushSpeed = 300.0f;
+
+	// ========== å—å‡»åé¦ˆ ==========
+	// å‘½ä¸­ç©å®¶åæ’­æ”¾å“ªä¸ªæ–¹å‘çš„å—å‡»è’™å¤ªå¥‡
+	// FromBoss = æ ¹æ®Bossåˆ°ç©å®¶çš„å®é™…æ–¹å‘åŠ¨æ€è®¡ç®—ï¼ˆæ¨èï¼Œå‰äº”ç§æ”»å‡»å‡å¯ä½¿ç”¨ï¼‰
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|HitReact")
 	EBossHitReactDirection HitReactDirection = EBossHitReactDirection::FromBoss;
 
-	// Á¬ĞøÉËº¦Ä£Ê½£¨Ğı×ª»Ó¿³£©£ºÉËº¦´°¿ÚÄÚ¿É¶ÔÍ¬Ò»Ä¿±êÔì³É¶à´ÎÉËº¦²¢¶à´Î´¥·¢ÊÜ»÷
+	// è¿ç»­ä¼¤å®³æ¨¡å¼ï¼ˆæ—‹è½¬æŒ¥ç ï¼‰ï¼šä¼¤å®³çª—å£å†…å¯å¯¹åŒä¸€ç›®æ ‡é€ æˆå¤šæ¬¡ä¼¤å®³å¹¶å¤šæ¬¡è§¦å‘å—å‡»
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Damage")
 	bool bContinuousDamage = false;
 
-	// Á¬ĞøÉËº¦Ä£Ê½ÏÂ£¬Ã¿´ÎÉËº¦ÅĞ¶¨µÄ¼ä¸ô£¨Ãë£©
+	// è¿ç»­ä¼¤å®³æ¨¡å¼ä¸‹ï¼Œæ¯æ¬¡ä¼¤å®³åˆ¤å®šçš„é—´éš”ï¼ˆç§’ï¼‰
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "BossGA|Damage", meta = (EditCondition = "bContinuousDamage"))
 	float RepeatDamageInterval = 0.25f;
-	// ========== ÊÜ»÷·´À¡½áÊø ==========
+	// ========== å—å‡»åé¦ˆç»“æŸ ==========
 
 protected:
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const override;
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
-	// ¡¾ÖØÒªĞŞÕı£¡¡¿±ØĞë¼ÓÉÏ UFUNCTION() ºê£¬ÇÒ²¹È«Ö®Ç°Â©µôµÄº¯Êı
+	// ã€é‡è¦ä¿®æ­£ï¼ã€‘å¿…é¡»åŠ ä¸Š UFUNCTION() å®ï¼Œä¸”è¡¥å…¨ä¹‹å‰æ¼æ‰çš„å‡½æ•°
 	UFUNCTION()
 	void OnMontageCompleted();
 
 	UFUNCTION()
 	void OnMontageInterrupted();
 
-	/** ÉèÖÃBossÓëÍæ¼ÒÖ®¼äµÄÅö×²£¨ºöÂÔ»ò»Ö¸´£©£¬ÓÃÓÚÌøÔ¾µÈ¼¼ÄÜ·ÀÖ¹²ÈÍ· */
+	/** è®¾ç½®Bossä¸ç©å®¶ä¹‹é—´çš„ç¢°æ’ï¼ˆå¿½ç•¥æˆ–æ¢å¤ï¼‰ï¼Œç”¨äºè·³è·ƒç­‰æŠ€èƒ½é˜²æ­¢è¸©å¤´ */
 	UFUNCTION(BlueprintCallable, Category = "BossGA")
 	void SetIgnorePlayerCollision(bool bIgnore);
 
-	/** ÏòÄ¿±ê·¢ËÍÊÜ»÷ÊÂ¼ş£¨¼ÆËã·½ÏòºóÏÂ·¢µ½Ä¿±êASC£© */
+	/** å‘ç›®æ ‡å‘é€å—å‡»äº‹ä»¶ï¼ˆè®¡ç®—æ–¹å‘åä¸‹å‘åˆ°ç›®æ ‡ASCï¼‰ */
 	void SendHitReactEvent(AActor* Victim);
 
-	/** ¸ù¾İ HitReactDirection ÅäÖÃ¼ÆËãÊÜ»÷·½ÏòTag */
+	/** åˆ¤æ–­æœ¬æ¬¡æ”»å‡»æ˜¯å¦è¢«ç©å®¶çš„ç›¾ç‰Œæœ‰æ•ˆæ ¼æŒ¡ï¼ˆç©å®¶é˜²å¾¡ä¸­ ä¸” æ”»å‡»æ¥è‡ªç©å®¶å‰æ–¹é˜²å¾¡é”¥å†…ï¼‰ */
+	bool IsAttackBlockedByShield(AActor* Victim) const;
+
+	/** æ ¹æ® HitReactDirection é…ç½®è®¡ç®—å—å‡»æ–¹å‘Tag */
 	FGameplayTag GetHitReactDirectionTag(AActor* Victim) const;
 
 private:
-	// ÓÃÓÚÉËº¦ÅĞ¶¨µÄÑÓ³ÙºÍÊÂ¼şÏìÓ¦£¨Í¬ÑùĞèÒª²¹ÉÏ UFUNCTION ÒÔ±£Ö¤Î¯ÍĞ¿ÉÒÔ°ó¶¨£©
+	// ç”¨äºä¼¤å®³åˆ¤å®šçš„å»¶è¿Ÿå’Œäº‹ä»¶å“åº”ï¼ˆåŒæ ·éœ€è¦è¡¥ä¸Š UFUNCTION ä»¥ä¿è¯å§”æ‰˜å¯ä»¥ç»‘å®šï¼‰
 	UFUNCTION()
 	void OnAttackStartEvent(FGameplayEventData Payload);
 
